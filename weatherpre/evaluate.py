@@ -8,6 +8,7 @@ variable names: geopotential, temperature, 2m_temperature, mean_sea_level_pressu
 """
 from __future__ import annotations
 import numpy as np, xarray as xr
+from .common import gcs_open
 from weatherbenchX import aggregation, weighting
 from weatherbenchX.data_loaders import xarray_loaders as xl
 from weatherbenchX.metrics import base as mbase, deterministic
@@ -19,11 +20,6 @@ FIELDS = {
     "t2m": ("2m_temperature", {}),
     "msl": ("mean_sea_level_pressure", {}),
 }
-
-def gcs_open(path: str) -> xr.Dataset:
-    import gcsfs
-    fs = gcsfs.GCSFileSystem(token="anon")
-    return xr.open_zarr(fs.get_mapper(path.replace("gs://", "")), chunks=None, decode_timedelta=True)
 
 def _loader(cls, src, var, sel, **kw):
     kws = dict(variables=[var], sel_kwargs=sel or None, **kw)

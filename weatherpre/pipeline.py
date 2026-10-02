@@ -5,7 +5,8 @@ from pathlib import Path
 import numpy as np, pandas as pd, xarray as xr
 from . import registry as R, grib, plot
 from .common import outdir
-from .evaluate import evaluate, gcs_open
+from .common import gcs_open
+from .evaluate import evaluate
 
 DATA = Path(os.environ.get("WEATHERPRE_DATA", "data"))
 FIELDS_LIVE = ("z500", "t850", "t2m")

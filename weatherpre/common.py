@@ -2,6 +2,7 @@
 from __future__ import annotations
 import datetime as dt
 from pathlib import Path
+import xarray as xr
 
 # Standard comparison fields (name -> (grib shortName, typeOfLevel, level))
 STD = {
@@ -34,3 +35,11 @@ def outdir(root: str | Path, model: str, init: dt.datetime) -> Path:
     p = Path(root) / model / init.strftime("%Y%m%dT%H")
     p.mkdir(parents=True, exist_ok=True)
     return p
+
+
+def gcs_open(path: str):
+    import gcsfs
+    fs = gcsfs.GCSFileSystem(token="anon")
+    return xr.open_zarr(fs.get_mapper(path.replace("gs://", "")), chunks=None, decode_timedelta=True)
+
+
