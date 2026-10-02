@@ -51,5 +51,5 @@ def evaluate(pred_src, target_src, init_times, lead_hours, fields=("z500", "t850
         for k in res.data_vars:
             name = str(k)
             kind = "acc" if "acc" in name.lower() else "rmse"
-            out[f"{f}_{kind}"] = res[k].squeeze(drop=True)
+            out[f"{f}_{kind}"] = res[k].squeeze(drop=True).drop_vars("level", errors="ignore")
     return xr.Dataset(out)
