@@ -6,7 +6,7 @@ import numpy as np, pandas as pd, xarray as xr
 from . import registry as R, grib, plot
 from .common import outdir
 from .common import gcs_open
-from .evaluate import evaluate
+from .evaluate import evaluate, FIELDS
 
 DATA = Path(os.environ.get("WEATHERPRE_DATA", "data"))
 FIELDS_LIVE = ("z500", "t850", "t2m")
@@ -58,10 +58,18 @@ def compare_historic(models, inits, leads, out: Path, fields=("z500", "t850", "t
         if not have: print(f"  {m}: no forecasts at requested inits, skipped"); continue
         L = [h for h in leads if np.timedelta64(h, "h").astype("timedelta64[ns]") in ds.prediction_timedelta.values]
         print(f"  {m}: {len(have)}/{len(inits)} inits, leads {L}", flush=True)
-        res[m] = evaluate(ds, tgt, np.array(have, "datetime64[ns]"), L, fields, clim)
+        cache = out / "per_model" / f"{m}.nc"; cache.parent.mkdir(parents=True, exist_ok=True)
+        if cache.exists():
+            res[m] = xr.load_dataset(cache); continue
+        try:
+            fm = [f for f in fields if FIELDS[f][0] in ds]      # e.g. NeuralGCM has no 2m_temperature
+            res[m] = evaluate(ds, tgt, np.array(have, "datetime64[ns]"), L, fm, clim)
+            res[m].to_netcdf(cache)
+        except Exception as e:   # keep going; report the failure
+            print(f"  {m}: FAILED {type(e).__name__}: {str(e)[:120]}", flush=True)
     return _save(res, out, fields, f"WB2 ERA5 truth, {len(inits)} inits")
 
-def compare_live(models, init, leads, out: Path, root=DATA, fields=FIELDS_LIVE):
+def compare_live(models, init, leads, out: Path, root=DATA, fields=FIELDS_LIVE, extra=None):
     """Models fetched from live hosted products, truth = IFS analysis (open-data step 0, a proxy)."""
     from .truth import ifs_analysis
     valids = sorted({init + dt.timedelta(hours=h) for h in leads})
@@ -71,6 +79,8 @@ def compare_live(models, init, leads, out: Path, root=DATA, fields=FIELDS_LIVE):
         nc = run(m, init, sorted(set(leads)), root, figs=False)
         ds = xr.open_dataset(nc)
         res[m] = evaluate(ds, tgt, np.array([init], "datetime64[ns]"), leads, fields, None)
+    for name, nc in (extra or {}).items():       # forecasts produced elsewhere (HF/Colab), same netCDF layout
+        res[name] = evaluate(xr.open_dataset(nc), tgt, np.array([init], "datetime64[ns]"), leads, fields, None)
     return _save(res, out, fields, f"truth: IFS analysis (proxy), init {init:%Y-%m-%d %HZ}")
 
 def _save(res, out: Path, fields, title):

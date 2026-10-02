@@ -14,6 +14,7 @@ def main(argv=None):
     p = sub.add_parser("compare", help="WeatherBench-X RMSE/ACC across models")
     p.add_argument("--models", required=True); p.add_argument("--init", required=True,
         help="single init, or START..END (historic, 12h steps)"); p.add_argument("--lead", default="24-240/24"); p.add_argument("--out", default="results/compare")
+    p.add_argument("--extra", action="append", default=[], help="NAME=forecast.nc produced elsewhere (e.g. HF/Colab run)")
     a = ap.parse_args(argv)
     if a.cmd == "models":
         print("# hosted WeatherBench2 (historic, key-free):");  [print(f"  {k:14s} {v['years']:18s} {v['note']}") for k, v in R.WB2_HOSTED.items()]
@@ -26,7 +27,7 @@ def main(argv=None):
     elif a.cmd == "latest":
         print(P.latest(a.model, parse_leads(a.lead), a.out))
     elif a.cmd == "compare":
-        models = a.models.split(","); leads = parse_leads(a.lead)
+        models = [m for m in a.models.split(",") if m]; leads = parse_leads(a.lead)
         if ".." in a.init:
             s, e = a.init.split(".."); s, e = parse_time(s), parse_time(e)
             inits = []; t = s
@@ -34,7 +35,7 @@ def main(argv=None):
             df = P.compare_historic(models, inits, leads, Path(a.out))
         else:
             init = parse_time(a.init)
-            df = P.compare_live(models, init, leads, Path(a.out))
+            df = P.compare_live(models, init, leads, Path(a.out), extra=dict(x.split("=", 1) for x in a.extra))
         print(df.groupby(["model", "lead_h"]).mean(numeric_only=True).round(3).to_string())
 
 if __name__ == "__main__":
