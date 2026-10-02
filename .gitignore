@@ -1,0 +1,12 @@
+data/
+results/**/*.nc
+*.grib2
+*.grib
+*.zarr
+*.pt
+*.ckpt
+*.onnx
+*.safetensors
+__pycache__/
+.hf_token
+.env

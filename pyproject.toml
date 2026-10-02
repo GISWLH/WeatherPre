@@ -1,0 +1,12 @@
+[project]
+name = "weatherpre"
+version = "0.1.0"
+description = "Near-real-time forecasts from frontier weather AI models, assembled from existing hosted data and frameworks"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+dependencies = ["numpy", "pandas", "xarray", "zarr", "gcsfs", "netCDF4", "matplotlib", "cfgrib", "eccodes",
+                "ecmwf-opendata", "weatherbenchX @ git+https://github.com/google-research/weatherbenchX.git"]
+[project.scripts]
+weatherpre = "weatherpre.cli:main"
+[tool.setuptools.packages.find]
+include = ["weatherpre*"]
