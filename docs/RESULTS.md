@@ -2,7 +2,7 @@
 
 ## 1. Oct 2020, WeatherBench 2 hosted forecasts vs ERA5 (1.5°, area-weighted, WeatherBench-X)
 
-62 initialisations (2020-10-01 00Z … 2020-10-31 12Z, every 12 h). GenCast / NeuralGCM-ens / IFS-ENS are ensemble **means**; the rest deterministic. Source: `results/oct2020/metrics.csv`.
+62 initialisations (2020-10-01 00Z … 2020-10-31 12Z, every 12 h). GenCast / IFS-ENS are ensemble **means**; the rest deterministic. Source: `results/oct2020/metrics.csv`.
 
 **z500 RMSE [m² s⁻²]**
 
