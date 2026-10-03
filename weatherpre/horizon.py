@@ -89,4 +89,8 @@ def compare(models="auto", init="latest", preset="week", cache=None, truth="auto
         table["lead_h"] = (table["lead_time"] / pd.Timedelta(hours=1)).astype(int); table = table.drop(columns="lead_time")
     if "consensus" in info:
         c = info["consensus"]; c["lead_h"] = (c["lead_time"] / pd.Timedelta(hours=1)).astype(int); info["consensus"] = c.drop(columns="lead_time")
+    for df in (table, info.get("consensus")):      # WB-X works in geopotential [m2 s-2]; report z500 error in metres
+        if df is not None and len(df):
+            for c in ("z500_rmse", "z500_spread"):
+                if c in df: df[c] = df[c] / 9.80665
     return fc, table, info

@@ -14,10 +14,15 @@ def aurora(t, leads):
         t = ecmwf_opendata.latest_init("ifs-hres", 0)
     source, variant = ("era5", "pretrained") if t <= ERA5_LAST else ("ifs", "finetuned")
     c = Client(SPACE, token=os.environ.get("HF_TOKEN") or get_token())
-    f, msg = c.predict(f"{t:%Y-%m-%dT%H}", source, ",".join(str(h) for h in leads), variant, api_name="/weatherpre_aurora")
-    if f is None: raise RuntimeError(msg)
-    print("[weatherpre] HF:", msg)
-    u = xr.load_dataset(f)                       # already z500,t850,t2m,msl on (lead, lat, lon)
+    parts, first = [], True
+    while True:                      # one GPU chunk per call (ZeroGPU proxy token is per request); state is kept on the Space
+        f, msg = c.predict(f"{t:%Y-%m-%dT%H}", source, ",".join(str(h) for h in leads), variant, first, api_name="/weatherpre_aurora")
+        if f is None: raise RuntimeError(msg)
+        print("[weatherpre] HF:", msg[:200]); first = False
+        d = xr.load_dataset(f)
+        if d.sizes.get("lead"): parts.append(d)
+        if msg.startswith("OK"): break
+    u = xr.concat(parts, "lead")
     it = np.datetime64(t, "ns")
     u = u.assign_coords(init_time=it, valid_time=("lead", it + u.lead.values.astype("timedelta64[h]").astype("timedelta64[ns]")))
     u.attrs.update(model="aurora", backend="hf", init=f"{t:%Y-%m-%dT%HZ}",

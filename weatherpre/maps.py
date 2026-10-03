@@ -63,5 +63,5 @@ def plot_scores(table, out, title="", fields=("z500", "t850", "t2m")):
         for (m, g), d in table.groupby(["model", "grid"]):
             if f"{f}_rmse" in d and d[f"{f}_rmse"].notna().any():
                 d = d.sort_values("lead_h"); ax.plot(d.lead_h / 24, d[f"{f}_rmse"], marker="o", ms=3, label=f"{m} ({g})")
-        ax.set_title(f"{f} RMSE", fontsize=9); ax.set_xlabel("lead [days]"); ax.grid(alpha=.3)
+        ax.set_title(f"{f} RMSE [{ {'z500': 'm', 't850': 'K', 't2m': 'K'}.get(f, '') }]", fontsize=9); ax.set_xlabel("lead [days]"); ax.grid(alpha=.3)
     axs[0][0].legend(fontsize=6); fig.suptitle(title, fontsize=9); fig.tight_layout(); fig.savefig(out, dpi=105); plt.close(fig)
