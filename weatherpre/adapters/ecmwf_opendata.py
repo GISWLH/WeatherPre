@@ -10,9 +10,10 @@ MODELS = {"ifs-hres": ("ifs", "oper"), "aifs-single": ("aifs-single", "oper")}
 def _levels(model):  # 500 hPa z, 850 hPa t
     return dict(pl=["gh" if model == "ifs" else "z", "t"], levs=[500, 850])
 
-def latest_init(model="aifs-single", min_leads=(0,)) -> dt.datetime:
+def latest_init(model="aifs-single", max_lead=0) -> dt.datetime:
+    """Newest cycle whose file for `max_lead` already exists (06/18Z runs only reach ~144 h)."""
     m, stream = MODELS[model]
-    return Client(source="ecmwf", model=m).latest(type="fc", stream=stream, step=max(min_leads),
+    return Client(source="ecmwf", model=m).latest(type="fc", stream=stream, step=int(max_lead),
                                                   param="2t", levtype="sfc")
 
 def fetch(model: str, init: dt.datetime, leads: list[int], out: Path) -> list[Path]:
@@ -21,7 +22,7 @@ def fetch(model: str, init: dt.datetime, leads: list[int], out: Path) -> list[Pa
     cl = Client(source="ecmwf", model=m)
     out.mkdir(parents=True, exist_ok=True); files = []
     for h in leads:
-        for tag, kw in (("sfc", dict(param=["2t", "msl"])),
+        for tag, kw in (("sfc", dict(param=["2t", "msl"] + (["tp"] if h > 0 else []))),
                         ("pl", dict(param=["gh" if m == "ifs" else "z", "t"], levelist=[500, 850]))):
             f = out / f"{model}_{init:%Y%m%dT%H}_f{h:03d}_{tag}.grib2"
             if not f.exists():

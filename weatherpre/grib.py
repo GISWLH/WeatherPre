@@ -30,6 +30,8 @@ def read(files, init) -> xr.Dataset:
                             rows.setdefault(name, {}).setdefault(lead, {})[int(lev)] = x
                 elif v == "t2m":
                     rows.setdefault("2m_temperature", {}).setdefault(lead, {})[None] = da
+                elif v == "tp":     # accumulated since forecast start, metres -> mm
+                    rows.setdefault("total_precipitation", {}).setdefault(lead, {})[None] = da * 1000.0
                 elif v in ("msl", "prmsl"):
                     rows.setdefault("mean_sea_level_pressure", {}).setdefault(lead, {})[None] = da
     out = {}

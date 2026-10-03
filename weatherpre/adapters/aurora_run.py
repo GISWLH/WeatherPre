@@ -63,7 +63,18 @@ def batch_from_ifs(init: dt.datetime, cache: Path):
     atmos = {k: np.stack(v)[..., order] for k, v in atmos.items()}
     return _batch(surf, atmos, lat, lon[order], init)
 
-def forecast(batch, steps: int, variant="pretrained", device="cpu") -> xr.Dataset:
+def _next_state(batch, last_two):
+    """Rebuild a 2-step input Batch from the last two predictions (to continue a rollout in a new GPU call)."""
+    import dataclasses
+    a, b = last_two
+    cat = lambda x, y: {k: torch.cat([x[k][:, -1:], y[k][:, -1:]], 1) for k in y}
+    return dataclasses.replace(b, surf_vars=cat(a.surf_vars, b.surf_vars), atmos_vars=cat(a.atmos_vars, b.atmos_vars),
+                               static_vars=batch.static_vars)
+
+def forecast(batch, steps: int, variant="pretrained", device="cpu", keep=None, lead0=0, time0=None,
+             return_state=False, user_schema=False):
+    """Roll Aurora `steps` x 6 h from `batch` (upstream `rollout`). keep: only store these absolute leads [h].
+    lead0/time0 let a later chunk continue an earlier one. user_schema -> z500,t850,t2m,msl on (lead, lat, lon)."""
     from aurora import Aurora, AuroraPretrained, AuroraSmallPretrained, rollout
     if variant == "small":
         model = AuroraSmallPretrained(); model.load_checkpoint()
@@ -72,23 +83,36 @@ def forecast(batch, steps: int, variant="pretrained", device="cpu") -> xr.Datase
     else:
         model = AuroraPretrained(); model.load_checkpoint()
     model = model.to(device).eval(); batch = batch.to(device)
-    outs, leads = [], []
+    outs, leads, last = [], [], []
     with torch.inference_mode():
         for i, p in enumerate(rollout(model, batch, steps=steps), 1):
-            outs.append(p.to("cpu")); leads.append(6 * i)
-    lat = outs[0].metadata.lat.numpy(); lon = outs[0].metadata.lon.numpy()
-    lv = list(outs[0].metadata.atmos_levels); li = [lv.index(500), lv.index(850)]
-    g = lambda f: xr.DataArray(np.stack([f(p) for p in outs])[None].astype("float32"))
+            p = p.to("cpu"); last = (last + [p])[-2:]
+            lead = lead0 + 6 * i
+            if keep is None or lead in keep:
+                outs.append(p); leads.append(lead)
+    state = _next_state(batch.to("cpu"), ([batch.to("cpu")] + last)[-2:]) if return_state else None
+    lat = last[-1].metadata.lat.numpy(); lon = last[-1].metadata.lon.numpy()
+    lv = list(last[-1].metadata.atmos_levels); li = [lv.index(500), lv.index(850)]
+    t0 = np.datetime64(time0 if time0 is not None else batch.metadata.time[0], "ns")
+    if user_schema:
+        d = ("lead", "latitude", "longitude")
+        ds = xr.Dataset({
+            "z500": (d, np.stack([p.atmos_vars["z"][0, 0, li[0]].numpy() for p in outs]) / 9.80665),
+            "t850": (d, np.stack([p.atmos_vars["t"][0, 0, li[1]].numpy() for p in outs])),
+            "t2m": (d, np.stack([p.surf_vars["2t"][0, 0].numpy() for p in outs])),
+            "msl": (d, np.stack([p.surf_vars["msl"][0, 0].numpy() for p in outs]) / 100)},
+            coords=dict(lead=np.array(leads), latitude=lat, longitude=lon))
+        ds.attrs["init"] = str(t0)
+        return (ds.sortby("latitude"), state) if return_state else ds.sortby("latitude")
     dims_s = ("time", "prediction_timedelta", "latitude", "longitude"); dims_a = ("time", "prediction_timedelta", "level", "latitude", "longitude")
     ds = xr.Dataset({
         "geopotential": (dims_a, np.stack([p.atmos_vars["z"][0, 0][li].numpy() for p in outs])[None]),
         "temperature": (dims_a, np.stack([p.atmos_vars["t"][0, 0][li].numpy() for p in outs])[None]),
         "2m_temperature": (dims_s, np.stack([p.surf_vars["2t"][0, 0].numpy() for p in outs])[None]),
         "mean_sea_level_pressure": (dims_s, np.stack([p.surf_vars["msl"][0, 0].numpy() for p in outs])[None]),
-    }, coords=dict(time=[np.datetime64(batch.metadata.time[0], "ns")],
-                   prediction_timedelta=np.array(leads, "timedelta64[h]").astype("timedelta64[ns]"),
-                   level=[500, 850], latitude=lat, longitude=lon))
-    return ds.sortby("latitude")
+    }, coords=dict(time=[t0], prediction_timedelta=np.array(leads, "timedelta64[h]").astype("timedelta64[ns]"),
+                   level=[500, 850], latitude=lat, longitude=lon)).sortby("latitude")
+    return (ds, state) if return_state else ds
 
 def main():
     import argparse

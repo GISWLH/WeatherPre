@@ -35,11 +35,11 @@ def available(model, init, h) -> bool:
     except urllib.error.HTTPError:
         return False
 
-def latest_init(model="aigfs", now: dt.datetime | None = None) -> dt.datetime:
+def latest_init(model="aigfs", max_lead=6, now: dt.datetime | None = None) -> dt.datetime:
     now = (now or dt.datetime.utcnow()).replace(minute=0, second=0, microsecond=0)
     t = now - dt.timedelta(hours=now.hour % 6)
     for _ in range(12):
-        if available(model, t, 0) and available(model, t, 6):
+        if available(model, t, 0) and available(model, t, int(max_lead)):
             return t
         t -= dt.timedelta(hours=6)
     raise RuntimeError(f"no {model} cycle found in last 3 days")
