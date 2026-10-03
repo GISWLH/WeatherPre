@@ -68,8 +68,9 @@ def _next_state(batch, last_two):
     import dataclasses
     a, b = last_two
     cat = lambda x, y: {k: torch.cat([x[k][:, -1:], y[k][:, -1:]], 1) for k in y}
+    H, W = next(iter(b.surf_vars.values())).shape[-2:]     # predictions are cropped (721 -> 720 lat)
     return dataclasses.replace(b, surf_vars=cat(a.surf_vars, b.surf_vars), atmos_vars=cat(a.atmos_vars, b.atmos_vars),
-                               static_vars=batch.static_vars)
+                               static_vars={k: v[..., :H, :W] for k, v in batch.static_vars.items()})
 
 def forecast(batch, steps: int, variant="pretrained", device="cpu", keep=None, lead0=0, time0=None,
              return_state=False, user_schema=False):
