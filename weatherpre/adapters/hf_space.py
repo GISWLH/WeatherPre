@@ -19,6 +19,7 @@ def aurora(t, leads):
         for attempt in range(4):     # a ZeroGPU task can be aborted: the Space keeps the rollout state, so just continue
             try:
                 f, msg = c.predict(f"{t:%Y-%m-%dT%H}", source, ",".join(str(h) for h in leads), variant, first, api_name="/weatherpre_aurora")
+                if f is None and not first and attempt < 3: raise RuntimeError(msg.strip().splitlines()[-1])
                 break
             except Exception as e:
                 if first or attempt == 3: raise

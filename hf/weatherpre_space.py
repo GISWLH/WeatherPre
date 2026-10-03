@@ -8,7 +8,7 @@ import gradio as gr
 import spaces
 
 REPO = "/tmp/WeatherPre"
-CHUNK = 12          # 6-hour steps per GPU call
+CHUNK = 8           # 6-hour steps per GPU call
 
 def _ensure_repo():
     if not os.path.isdir(REPO):
