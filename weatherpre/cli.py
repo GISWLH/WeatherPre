@@ -15,11 +15,36 @@ def main(argv=None):
     p.add_argument("--models", required=True); p.add_argument("--init", required=True,
         help="single init, or START..END (historic, 12h steps)"); p.add_argument("--lead", default="24-240/24"); p.add_argument("--out", default="results/compare")
     p.add_argument("--extra", action="append", default=[], help="NAME=forecast.nc produced elsewhere (e.g. HF/Colab run)")
+    p = sub.add_parser("forecast", help="one call: weatherpre forecast aifs 2020-10-03 --days 15")
+    p.add_argument("model"); p.add_argument("init", nargs="?", default="latest")
+    g = p.add_mutually_exclusive_group(); g.add_argument("--days", type=int); g.add_argument("--hours", help="e.g. 6,12,24 or 6-48/6"); g.add_argument("--preset", choices=["hours", "week", "15days"])
+    p.add_argument("--out", default="data"); p.add_argument("--plot", action="store_true", help="also write a maps PNG next to the netCDF")
+    p = sub.add_parser("horizon", help="multi-model table + maps for hours/week/15days")
+    p.add_argument("init", nargs="?", default="latest"); p.add_argument("--preset", default="week", choices=["hours", "week", "15days"])
+    p.add_argument("--models", default="auto"); p.add_argument("--out", default="results/horizon")
     a = ap.parse_args(argv)
     if a.cmd == "models":
         print("# hosted WeatherBench2 (historic, key-free):");  [print(f"  {k:14s} {v['years']:18s} {v['note']}") for k, v in R.WB2_HOSTED.items()]
         print("# live hosted products:");  [print(f"  {k:14s} {v['note']}") for k, v in R.LIVE.items()]
         print("# Earth2Studio (GPU, Colab/HF):");  [print(f"  {k:26s} -> earth2studio.models.px.{v}") for k, v in R.EARTH2STUDIO.items()]
+        return
+    if a.cmd == "forecast":
+        from . import api, maps
+        ds = api.forecast(a.model, a.init, lead_hours=parse_leads(a.hours) if a.hours else None, lead_days=a.days, preset=a.preset, cache=a.out)
+        out = Path(a.out) / "forecasts"; out.mkdir(parents=True, exist_ok=True)
+        stem = f"{ds.attrs['model']}_{ds.attrs['init']}_{int(ds.lead.max())}h"
+        ds.to_netcdf(out / f"{stem}.nc"); print(ds); print("wrote", out / f"{stem}.nc")
+        if a.plot:
+            ls = [int(h) for h in ds.lead.values[:: max(1, len(ds.lead) // 4)]][:4]
+            print("wrote", maps.plot_maps(ds, variables=("z500", "t2m", "tp"), leads=ls, out=str(out / f"{stem}.png")))
+        return
+    if a.cmd == "horizon":
+        from . import api, horizon, maps
+        out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
+        fc, table, info = horizon.compare(a.models if a.models == "auto" else a.models.split(","), a.init, a.preset)
+        tag = f"{a.preset}_{next(iter(fc.values())).attrs['init']}"
+        table.round(3).to_csv(out / f"{tag}_score.csv", index=False)
+        print("truth:", info["truth"], "| skipped:", info["skipped"]); print(table.round(2).to_string(index=False)[:3000])
         return
     from . import pipeline as P
     if a.cmd == "run":
