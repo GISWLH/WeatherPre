@@ -1,49 +1,54 @@
 # WeatherPre
 
-近实时对比前沿气象/气候 AI 模型的预报。**不从零搭建**:只组装现成的托管数据、官方推理库和评测库。
-Near-real-time forecasts from frontier weather/climate AI models, **assembled from existing hosted data, upstream inference packages and WeatherBench-X** — no model or metric is re-implemented here.
+**Near-real-time forecasts from frontier AI weather models, assembled from existing hosted data, upstream inference packages and WeatherBench-X — nothing re-implemented.**
 
-路线优先级 / Route order: **① 托管预报产品 hosted data → ② 官方/成熟推理框架 + 真实初值 → ③ 自建 [`GISWLH/WeatherAI`](https://github.com/GISWLH/WeatherAI) 移植**(最后手段)。详见 / see [`docs/SURVEY.md`](docs/SURVEY.md).
+近实时前沿 AI 天气模型预报：只组装现成的托管数据、官方推理库和 WeatherBench-X 评测，不重复造轮子。
 
-## 已跑通 / What has actually run
+Route order / 路线优先级：**① hosted data 托管数据 → ② upstream package on GPU (HF / Colab) 官方包 GPU 推理 → ③ our port [`GISWLH/WeatherAI`](https://github.com/GISWLH/WeatherAI)**。Survey: [`docs/SURVEY.md`](docs/SURVEY.md) · numbers: [`docs/RESULTS.md`](docs/RESULTS.md)
 
-| Route | Model | Init | 数据来源 / Source | 状态 |
-|---|---|---|---|---|
-| ① hosted, historic | IFS HRES, GraphCast, Pangu, FuXi, GenCast(mean), NeuralGCM, IFS-ENS(mean) | 2020-10-01 … 10-31, 00/12Z (62) | WeatherBench 2 GCS zarr, ERA5 truth, 1.5° | ✅ [`results/oct2020`](results/oct2020) |
-| ① hosted, latest | AIFS-single, IFS HRES (ECMWF Open Data); AIGFS, GFS (NOAA S3) | 2026-10-02 06Z (GFS 12Z) | `ecmwf-opendata`, HTTPS byte-range | ✅ forecast.nc + maps [`results/latest`](results/latest) |
-| ① hosted, verified | the four above | 2026-09-29 06Z | truth = IFS analysis (proxy, not ERA5) | ✅ [`results/live_2026-09-29T06`](results/live_2026-09-29T06) |
-| ② inference on HF GPU | Aurora 0.25° (`microsoft-aurora`, upstream) | 2020-10-01 00Z, ERA5 IC | ZeroGPU Space tab, 48 h in 49 s | ✅ [`results/aurora_2020-10-01`](results/aurora_2020-10-01) |
-| ② inference on HF GPU | Aurora 0.25° HRES-T0 fine-tuned | 2026-10-02 06Z, IFS-analysis IC | same | ✅ 48 h forecast produced (not yet verifiable: valid times are in the future) |
-| ② Colab | Aurora; Earth2Studio models | – | [`notebooks/`](notebooks) | ⚠️ written, **not executed on Colab** |
-| ① WeatherNext 2/3 | – | – | needs Google allow-list | ❌ blocked (user action) |
+## Models / 模型
 
-Numbers are in the result folders (`metrics.csv`, `skill.png`) and summarised in [`docs/RESULTS.md`](docs/RESULTS.md).
+Status: ✅ ran in this repo (outputs in `results/`) · ⚠️ route exists, **not run** · ❌ blocked. Resolution of hosted WeatherBench 2 (WB2) data here is 1.5°.
 
-## 用法 / Usage
+| Model | Type | Route | Lead · grid | Licence note | Status |
+|---|---|---|---|---|---|
+| **IFS HRES** | NWP, medium-range | hosted: ECMWF Open Data (latest ~4 d only) · WB2 (2016–22) | ≤360 h (00/12Z) · 0.25° / 1.5° | CC-BY-4.0 | ✅ |
+| **AIFS-single** | AI, medium-range | hosted: ECMWF Open Data (latest ~4 d only; no archive) | ≤360 h (00/12Z) · 0.25° | CC-BY-4.0 | ✅ latest · ❌ 2020 |
+| AIFS-ENS | AI, ensemble | hosted: Open Data (dir exists) | not checked | CC-BY-4.0 | ⚠️ |
+| **AIGFS** (NOAA) | AI, medium-range | hosted: NOAA S3 (daily dirs since 2026-04-16) | ≤384 h · 0.25° | public domain | ✅ |
+| **GFS** (NOAA) | NWP baseline | hosted: NOAA S3 (0.25° present 2022-01, absent 2021-03) | ≤384 h · 0.25° | public domain | ✅ |
+| **GraphCast** *Science* 2023 | AI, medium-range | hosted: WB2 (2019-11…2021-01) | ≤240 h · 1.5° | upstream weights NC (re-check) | ✅ |
+| **Pangu-Weather** *Nature* 2023 | AI, medium-range | hosted: WB2 (2018–22) | ≤240 h · 1.5° | upstream NC (re-check) | ✅ |
+| **FuXi** *npj CAS* 2023 | AI, medium-range | hosted: WB2 (2020) | ≤360 h · 1.5° | upstream NC (re-check) | ✅ |
+| **GenCast** *Nature* 2025 | AI, ensemble (mean in WB2) | hosted: WB2 (2020) | ≤360 h, 12 h steps · 1.5° | upstream NC (re-check) | ✅ mean |
+| **NeuralGCM** *Nature* 2024 | hybrid, det./ens. | hosted: WB2 (2020) | ≤360 h, 12 h steps · 1.5° | re-check | ✅ det. |
+| **IFS-ENS** | NWP ensemble (mean) | hosted: WB2 (2018–22) | ≤360 h · 1.5° | WB2 terms | ✅ mean |
+| **Aurora** *Nature* 2025 | AI foundation, 0.25° | upstream `microsoft-aurora` on **HF ZeroGPU** (ERA5 or IFS-analysis initial conditions); [Colab](notebooks/colab_aurora.ipynb) | any steps (chunked) · 0.25° | MIT weights | ✅ HF · ⚠️ Colab |
+| FourCastNet3 / SFNO, Pangu, FuXi, FengWu, GraphCast-op., AIFS(2) | AI, medium-range | Earth2Studio ([wrapper](weatherpre/adapters/earth2studio_run.py), [Colab](notebooks/colab_earth2studio.ipynb)) | model-specific | per model | ⚠️ not run (needs Py ≥ 3.11 GPU) |
+| GenCast-mini, WN-Cyclones-mini, ACE2-ERA5, DLESyM, SamudrACE | AI, ensemble / climate | Earth2Studio, or our [WeatherAI](https://github.com/GISWLH/WeatherAI) ports | 1° | Apache-2.0 / per model | ⚠️ not run |
+| StormCast, CorrDiff | AI, km-scale (CONUS / downscaling) | Earth2Studio · WeatherAI port | 3 km | Apache-2.0 | ⚠️ not run |
+| FuXi-S2S *Nat. Commun.* 2024 | S2S | Earth2Studio · WeatherAI port | daily, 42 d | **CC-BY-NC-ND** | ⚠️ not run |
+| ORCA-DL, UniCM | ocean / SST | WeatherAI port only | monthly | no licence / no public ckpt | ⚠️ not run |
+| TropiCycloneNet | tropical cyclone | WeatherAI port only | 24 h track | CC-BY-4.0 ckpt | ⚠️ not run |
+| WeatherNext 2 / 3 | AI, ensemble 0.25° | Google GCS/BigQuery/EE, allow-list | ≤15 d | experimental ToS | ❌ needs Google allow-list |
+
+## Usage / 用法
 
 ```bash
-pip install -e .                       # needs Python >= 3.11; eccodes for GRIB
-weatherpre models                      # list models and their route
-weatherpre latest --model aifs-single --lead 0-120/24      # newest complete cycle -> data/.../forecast.nc + maps.png
-weatherpre run --model aigfs --init 2026-10-02T06 --lead 0-240/24
-weatherpre run --model graphcast --init 2020-10-01T00 --lead 24-240/24     # extract from WeatherBench 2
+pip install -e .          # Python ≥ 3.11
+weatherpre models         # model list and route
+weatherpre latest --model aifs-single --lead 0-120/24
 weatherpre compare --models hres,graphcast,pangu,fuxi,gencast --init 2020-10-01T00..2020-10-31T12 --lead 24-240/24
-weatherpre compare --models aifs-single,aigfs,ifs-hres,gfs --init 2026-09-29T06 --lead 24-72/24 \
-                   --extra aurora=data/hf/aurora_finetuned_2026-09-29T12.nc   # add a forecast produced on HF/Colab
 ```
 
-All forecasts use the WeatherBench 2 layout (`time, prediction_timedelta, level, latitude, longitude`; `geopotential`, `temperature`, `2m_temperature`, `mean_sea_level_pressure`), scored with **WeatherBench-X** (area-weighted RMSE, ACC).
+Output layout = WeatherBench 2 (`time, prediction_timedelta, level, latitude, longitude`); scoring by WeatherBench-X (area-weighted RMSE, ACC). GPU runs: HF Space `LonghaoWang/weatherai-graphcast-smoke` ("WeatherPre" tab, [`docs/GPU.md`](docs/GPU.md)) or Colab.
 
-GPU 推理 / GPU inference: HF Space [`LonghaoWang/weatherai-graphcast-smoke`](https://huggingface.co/spaces/LonghaoWang/weatherai-graphcast-smoke) (ZeroGPU; "WeatherPre" accordion; code in [`hf/`](hf)) or the Colab notebooks. Tokens are never stored in the repo.
+## Limits / 局限
 
-## 局限 / Limits (read before quoting numbers)
+* ECMWF Open Data keeps ~4 days: **no archive**. Hosted 2020 forecasts exist only for the WB2 models above (00/12Z inits; WB2 stops at 240 h for GraphCast/Pangu/HRES, 360 h for FuXi/GenCast/NeuralGCM/IFS-ENS).
+* Latest-date truth = IFS analysis (proxy); future valid times cannot be scored. ERA5 lags ~5 days and is not wired for live.
+* Aurora/Oct-2020 uses the ERA5-pretrained checkpoint inside its training period: a pipeline check, not out-of-sample skill.
 
-* AIFS-single/IFS Open Data keep only ~4 days → **no archive**; "latest" means latest cycle, historic scoring uses WeatherBench 2.
-* Recent-date truth is the **IFS analysis** (proxy): it favours IFS-derived systems and penalises GFS/AIGFS at short leads. Not an ERA5 score; no ACC (no 0.25° climatology wired for live).
-* Oct 2020 Aurora run uses the ERA5-pretrained checkpoint on ERA5 — Oct 2020 lies in its training period, so this is a pipeline check, **not** an out-of-sample skill claim.
-* Historic WeatherBench 2 forecasts are different systems with different initial conditions (ERA5- vs IFS-initialised) and resolutions (1.5° here).
-* Not run: WeatherNext, FourCastNet3/Pangu/FuXi/GraphCast live inference, ensembles/CRPS, S2S/ocean models (see SURVEY for routes).
+## Licences / 许可
 
-## 许可 / Licences
-
-Code: Apache-2.0. Data: ECMWF Open Data CC-BY-4.0 (attribute ECMWF); NOAA public domain; WeatherBench 2 / ERA5 per Copernicus terms. Aurora weights MIT. Several upstream weights are non-commercial (e.g. FuXi-S2S CC-BY-NC-ND) — never committed; check each licence before redistributing outputs.
+Code Apache-2.0. ECMWF Open Data CC-BY-4.0 (credit ECMWF); NOAA public domain; ERA5 per Copernicus terms. NC / ND weights are never committed.
