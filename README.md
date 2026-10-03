@@ -24,7 +24,7 @@ ds = wp.forecast("ifs", init="2020-10-03", lead_hours=[6, 12, 24, 48])
 ds = wp.forecast("aurora", init="2020-10-03", lead_days=15)     # 0.25 deg, runs on HF ZeroGPU (HF_TOKEN)
 
 ds.z500.isel(lead=2).plot()                                     # z500 [m]; also t850, t2m, msl [hPa], tp [mm] if available
-wp.plot_maps(ds, ("z500", "t2m"), [24, 120, 240], "maps.png")   # cartopy maps, labelled model / init / lead
+wp.plot_maps(ds, ("z500", "t2m"), [24, 120, 240], "maps.png")   # Robinson maps cut at 60°S, labelled model / init / lead
 fc, table, info = wp.compare("auto", "2020-10-03", preset="week")   # all suitable models + RMSE table
 ```
 
@@ -128,11 +128,11 @@ CSV: [`results/examples/2020-10-03_15days_scores.csv`](results/examples/2020-10-
 
 ### Latest cycle (live) / 最新一轮
 
-`wp.forecast("aifs", init="latest", lead_days=15)`: AIFS-single, init 2026-10-03 00Z, ECMWF Open Data, 0.25°, 15 leads (+24 … +360 h).
+`wp.forecast("aifs", init="latest", lead_days=15)`: AIFS-single, init 2026-10-03 06Z, ECMWF Open Data, 0.25°, 15 leads (+24 … +360 h).
 
 ![AIFS latest](docs/img/aifs_latest_maps.png)
 
-Four-model view (`aifs-single`, `ifs-hres`, `aigfs`, `gfs`, same cycle, +120 h; [t2m](docs/img/latest_week_t2m_models.png)):
+Four-model view (`aifs-single`, `ifs-hres`, `aigfs`, `gfs`, all on the 2026-10-03 00Z cycle, +120 h; [t2m](docs/img/latest_week_t2m_models.png)):
 
 ![latest z500](docs/img/latest_week_z500_models.png)
 
@@ -176,4 +176,6 @@ Status: ✅ ran in this repo (outputs in `results/`) · ⚠️ route exists, **n
 
 ## Licences / 许可
 
-Code Apache-2.0. ECMWF Open Data CC-BY-4.0 (credit ECMWF); NOAA public domain; ERA5 per Copernicus terms. NC / ND weights are never committed. Regenerate every image: `python scripts/make_examples.py aifs_latest hours week days15 latest_models`.
+Code Apache-2.0. ECMWF Open Data CC-BY-4.0 (credit ECMWF); NOAA public domain; ERA5 per Copernicus terms. NC / ND weights are never committed. Regenerate every image: `python scripts/make_examples.py aifs_latest hours week days15 latest_models` (downloads are cached in `data/cache`, so re-styling needs no re-download; if `data.ecmwf.int` is unreachable set `WEATHERPRE_ECMWF_SOURCE=google` or `aws` for the official cloud mirrors).
+
+Maps: Robinson globe cut at 60°S with [`GISWLH/cartopy-robinson-lat-clip`](https://github.com/GISWLH/cartopy-robinson-lat-clip) (`clip_robinson_south_of`), which keeps the oval's curved sides instead of the rectangular side cuts `set_extent(lat_min=-60)` gives. z500 in dam with 8 dam isolines and the 588 dam line (subtropical high edge) in bold; every model keeps one colour across maps and score charts, AI solid and NWP dashed.
