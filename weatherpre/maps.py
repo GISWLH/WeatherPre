@@ -9,6 +9,7 @@ STYLE = {"z500": dict(cmap="Spectral_r", label="z500 [m]"), "t850": dict(cmap="R
          "tp": dict(cmap="YlGnBu", label="precip since init [mm]", vmin=0, vmax=None)}
 
 def _wrap(x):
+    x = x.transpose(..., "latitude", "longitude")
     """lon 0..360 -> -180..180 (cartopy/pcolormesh need a monotonic, non-wrapping axis)."""
     return x.assign_coords(longitude=(((x.longitude + 180) % 360) - 180)).sortby("longitude")
 
@@ -54,3 +55,13 @@ def plot_models(dsets: dict, var="z500", lead=168, truth: xr.DataArray | None = 
     fig.colorbar(im, ax=fig.axes, shrink=0.6, pad=0.02, label=st["label"])
     fig.suptitle(title, fontsize=10); fig.savefig(out, dpi=105, bbox_inches="tight"); plt.close(fig)
     return out
+
+def plot_scores(table, out, title="", fields=("z500", "t850", "t2m")):
+    """Lines = models, x = lead [days]: RMSE of z500/t850/t2m (WeatherBench-X) from the compare() table."""
+    fig, axs = plt.subplots(1, len(fields), figsize=(4.3 * len(fields), 3.4), squeeze=False)
+    for ax, f in zip(axs[0], fields):
+        for (m, g), d in table.groupby(["model", "grid"]):
+            if f"{f}_rmse" in d and d[f"{f}_rmse"].notna().any():
+                d = d.sort_values("lead_h"); ax.plot(d.lead_h / 24, d[f"{f}_rmse"], marker="o", ms=3, label=f"{m} ({g})")
+        ax.set_title(f"{f} RMSE", fontsize=9); ax.set_xlabel("lead [days]"); ax.grid(alpha=.3)
+    axs[0][0].legend(fontsize=6); fig.suptitle(title, fontsize=9); fig.tight_layout(); fig.savefig(out, dpi=105); plt.close(fig)

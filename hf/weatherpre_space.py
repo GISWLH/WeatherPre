@@ -20,12 +20,15 @@ def _ensure_repo():
 
 @spaces.GPU(duration=120)
 def _aurora_gpu(batch, steps, variant, keep, lead0, time0):
-    import torch
-    from weatherpre.adapters import aurora_run
-    t = time.time()
-    ds, state = aurora_run.forecast(batch, int(steps), variant, "cuda", keep=keep, lead0=lead0, time0=time0,
-                                    return_state=True, user_schema=True)
-    return ds, state, f"peak_mem={torch.cuda.max_memory_allocated()/2**30:.1f}GiB chunk_s={time.time()-t:.0f}"
+    try:
+        import torch
+        from weatherpre.adapters import aurora_run
+        t = time.time()
+        ds, state = aurora_run.forecast(batch, int(steps), variant, "cuda", keep=keep, lead0=lead0, time0=time0,
+                                        return_state=True, user_schema=True)
+        return ds, state, f"peak_mem={torch.cuda.max_memory_allocated()/2**30:.1f}GiB chunk_s={time.time()-t:.0f}"
+    except Exception:
+        return None, None, "GPU-WORKER " + traceback.format_exc()[-2500:]
 
 def run_aurora(init: str, source: str, leads: str, variant: str):
     """init like 2020-10-01T00 ; source era5|ifs ; leads '24,48,...' (hours, multiples of 6) ; variant small|pretrained|finetuned"""
@@ -45,6 +48,7 @@ def run_aurora(init: str, source: str, leads: str, variant: str):
         while done < total:
             k = min(CHUNK, total - done)
             ds, batch, m = _aurora_gpu(batch, k, variant, keep, done * 6, str(t))
+            if ds is None: return None, m
             if ds.sizes["lead"]: parts.append(ds)
             msgs.append(m); done += k
         out = xr.concat(parts, "lead")

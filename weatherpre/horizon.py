@@ -4,7 +4,7 @@ import datetime as dt, warnings
 import numpy as np, pandas as pd, xarray as xr
 from . import api, registry as R
 from .common import gcs_open
-from .evaluate import evaluate
+from .evaluate import evaluate, FIELDS
 
 ERA5_LAST = np.datetime64("2021-12-31T18")        # last time in the WB2 6-hourly ERA5 stores used here
 
@@ -14,9 +14,11 @@ def _as_targets(d: xr.Dataset) -> xr.Dataset:
     return x.drop_vars("time").assign_coords(time=("prediction_timedelta", valid)).swap_dims({"prediction_timedelta": "time"}).drop_vars("prediction_timedelta")
 
 def _score(ds, init64, leads, truth, clim):
-    return evaluate(api.to_wb2(ds), truth, np.array([init64], "datetime64[ns]"), leads, ("z500", "t850", "t2m"), clim)
+    w = api.to_wb2(ds)
+    fields = tuple(f for f, (v, _) in FIELDS.items() if v in w and f != "msl")      # e.g. NeuralGCM has no 2 m temperature
+    return evaluate(w, truth, np.array([init64], "datetime64[ns]"), leads, fields, clim)
 
-def compare(models="auto", init="latest", preset="week", cache=None, truth="auto", verbose=True):
+def compare(models="auto", init="latest", preset="week", cache=None, truth="auto", verbose=True, extra=None):
     """Returns (forecasts: dict[name -> Dataset], table: DataFrame, info: dict).
     Historic init  -> scored against ERA5 (WeatherBench-X RMSE/ACC; 1.5 deg models vs 1.5 deg ERA5, 0.25 deg vs 0.25 deg).
     Latest init    -> leads whose valid time already has an IFS analysis are scored against it (proxy truth);
@@ -29,6 +31,9 @@ def compare(models="auto", init="latest", preset="week", cache=None, truth="auto
             fc[m] = api.forecast(m, init, preset=preset, cache=cache, verbose=verbose)
         except Exception as e:                                       # keep going, report below
             skipped[m] = f"{type(e).__name__}: {str(e)[:160]}"
+    for name, d in (extra or {}).items():            # forecasts produced elsewhere (e.g. HF/Colab Aurora), cut to this preset
+        L = [h for h in api.PRESETS[preset] if h in d.lead.values]
+        if L: fc[name] = d.sel(lead=L)
     if not fc: raise api.BackendUnavailable(f"no model produced a forecast: {skipped}")
     t0 = np.datetime64(next(iter(fc.values())).init_time.values, "ns")
     rows, info = [], {"skipped": skipped, "truth": None}
@@ -75,7 +80,7 @@ def compare(models="auto", init="latest", preset="week", cache=None, truth="auto
             tgt = _as_targets(mean)
             cons = []
             for m in big:
-                r = evaluate(wb[m], tgt, np.array([t0], "datetime64[ns]"), common, ("z500", "t850", "t2m"), None)
+                r = evaluate(wb[m], tgt, np.array([t0], "datetime64[ns]"), common, tuple(f for f, (v, _) in FIELDS.items() if v in wb[m] and f != "msl"), None)
                 df = r.to_dataframe().reset_index().rename(columns=lambda c: c.replace("_rmse", "_spread") if c.endswith("_rmse") else c)
                 df.insert(0, "model", m); cons.append(df)
             info["consensus"] = pd.concat(cons)
