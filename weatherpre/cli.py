@@ -1,9 +1,17 @@
-import argparse, datetime as dt
+import argparse, sys, datetime as dt
 from pathlib import Path
 from . import registry as R
 from .common import parse_time, parse_leads
 
 def main(argv=None):
+    try:
+        return _main(argv)
+    except Exception as e:
+        if type(e).__name__ == "BackendUnavailable":
+            print(f"weatherpre: {e}", file=sys.stderr); raise SystemExit(2)
+        raise
+
+def _main(argv=None):
     ap = argparse.ArgumentParser("weatherpre", description="Near-real-time AI weather forecasts from existing hosted data / frameworks")
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("models", help="list models and their access route")

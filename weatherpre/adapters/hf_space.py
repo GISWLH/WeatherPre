@@ -1,6 +1,6 @@
 """Run Aurora on the HF ZeroGPU Space via gradio_client. Token: env HF_TOKEN, else the cached huggingface login. Never printed."""
 from __future__ import annotations
-import datetime as dt, os, tempfile
+import datetime as dt, os, tempfile, time
 import numpy as np, xarray as xr
 
 SPACE = os.environ.get("WEATHERPRE_SPACE", "LonghaoWang/weatherai-graphcast-smoke")
@@ -16,7 +16,13 @@ def aurora(t, leads):
     c = Client(SPACE, token=os.environ.get("HF_TOKEN") or get_token())
     parts, first = [], True
     while True:                      # one GPU chunk per call (ZeroGPU proxy token is per request); state is kept on the Space
-        f, msg = c.predict(f"{t:%Y-%m-%dT%H}", source, ",".join(str(h) for h in leads), variant, first, api_name="/weatherpre_aurora")
+        for attempt in range(4):     # a ZeroGPU task can be aborted: the Space keeps the rollout state, so just continue
+            try:
+                f, msg = c.predict(f"{t:%Y-%m-%dT%H}", source, ",".join(str(h) for h in leads), variant, first, api_name="/weatherpre_aurora")
+                break
+            except Exception as e:
+                if first or attempt == 3: raise
+                print(f"[weatherpre] HF chunk failed ({str(e)[:80]}), retrying", flush=True); time.sleep(30)
         if f is None: raise RuntimeError(msg)
         print("[weatherpre] HF:", msg[:200]); first = False
         d = xr.load_dataset(f)

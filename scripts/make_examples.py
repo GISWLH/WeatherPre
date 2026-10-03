@@ -9,16 +9,18 @@ IMG = pathlib.Path("docs/img"); IMG.mkdir(parents=True, exist_ok=True)
 RES = pathlib.Path("results/examples"); RES.mkdir(parents=True, exist_ok=True)
 INIT = "2020-10-03"
 AUR = pathlib.Path("data/forecasts/aurora_2020-10-03T00Z_360h.nc")
+AUR_H = pathlib.Path("data/forecasts/aurora_2020-10-03T00Z_48h.nc")
 
 def era5_z500(valid):
     ds = gcs_open(R.WB2_TRUTH); return (ds.geopotential.sel(time=np.datetime64(valid, "ns"), level=500) / 9.80665).sortby("latitude")
 
-def aurora_extra():
-    if not AUR.exists(): return {}
-    u = xr.open_dataset(AUR).load(); return {"aurora": u}
+def aurora_extra(preset=None):
+    f = AUR_H if preset == "hours" else AUR       # Aurora 0.25deg run on HF ZeroGPU (see run_aurora.py); optional
+    if not f.exists(): return {}
+    return {"aurora": xr.open_dataset(f).load()}
 
 def horizon_stage(preset, lead_for_map, title):
-    fc, table, info = horizon.compare("auto", INIT, preset, extra=aurora_extra())
+    fc, table, info = horizon.compare("auto", INIT, preset, extra=aurora_extra(preset))
     print("truth:", info["truth"], "skipped:", info["skipped"])
     table.round(3).to_csv(RES / f"{INIT}_{preset}_scores.csv", index=False)
     truth = era5_z500(np.datetime64(INIT + "T00") + np.timedelta64(lead_for_map, "h"))
