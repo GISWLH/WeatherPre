@@ -171,7 +171,7 @@ Status: ✅ ran in this repo (outputs in `results/`) · ⚠️ route exists, **n
 * WB 2 inits are 00/12Z; hosted data is 1.5° (Aurora / Open Data / NOAA: 0.25°). Scores of different grids are compared against the matching ERA5 grid and are not strictly like-for-like.
 * Everything is scored against ERA5, including IFS HRES (its own analysis would score it better). `–` = lead not provided (12 h-step models have no +6 h).
 * Future valid times cannot be scored; latest-cycle tables show model spread only.
-* Aurora 2020 uses ERA5 initial conditions and the ERA5-pretrained checkpoint, inside its training period: a pipeline check, not out-of-sample skill. HF ZeroGPU is quota-limited and may abort a long rollout.
+* Aurora 2020 uses ERA5 initial conditions and the ERA5-pretrained checkpoint, inside its training period: a pipeline check, not out-of-sample skill. **The 2020-10-03 15-day Aurora run is not in the examples**: on HF it completed 7 of 8 chunks (to +336 h) and then hit the Pro ZeroGPU quota (resets after ~23 h) before the result could be collected, so no Aurora panel is shown; a re-run needs a fresh quota (`python scripts/run_aurora.py days15`, then `make_examples.py week days15` picks it up). Earlier, Aurora ran for 2020-10-01 (see `results/aurora_2020-10-01`).
 * Colab notebooks and the Earth2Studio wrapper are provided but **not executed**.
 
 ## Licences / 许可
