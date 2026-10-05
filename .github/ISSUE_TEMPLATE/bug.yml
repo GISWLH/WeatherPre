@@ -1,0 +1,15 @@
+name: Bug report
+description: Something failed or a score looks wrong
+labels: ["bug"]
+body:
+  - type: textarea
+    id: call
+    attributes: {label: The call, description: "e.g. wp.forecast('gefs', 't2m', '6w', init='2020-10-01')", render: python}
+    validations: {required: true}
+  - type: textarea
+    id: error
+    attributes: {label: What happened (traceback / output), render: text}
+    validations: {required: true}
+  - type: input
+    id: env
+    attributes: {label: "Python / OS / weatherpre version"}

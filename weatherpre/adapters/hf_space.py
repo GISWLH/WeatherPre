@@ -1,6 +1,6 @@
 """Run Aurora on the HF ZeroGPU Space via gradio_client. Token: env HF_TOKEN, else the cached huggingface login. Never printed."""
 from __future__ import annotations
-import datetime as dt, os, tempfile, time
+import datetime as dt, os, time
 import numpy as np, xarray as xr
 
 SPACE = os.environ.get("WEATHERPRE_SPACE", "LonghaoWang/weatherai-graphcast-smoke")

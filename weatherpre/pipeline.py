@@ -1,6 +1,6 @@
 """run / latest / compare implemented on top of the adapters + WeatherBench-X."""
 from __future__ import annotations
-import datetime as dt, json, os
+import datetime as dt, os
 from pathlib import Path
 import numpy as np, pandas as pd, xarray as xr
 from . import registry as R, grib, plot

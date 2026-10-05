@@ -60,3 +60,21 @@ if "latest_models" in stage:
     for v in ("z500", "t2m"):
         maps.plot_models(fc, v, 120, None, str(IMG / f"latest_week_{v}_models.png"), f"Latest cycle: +120 h from {str(init)[:13].replace('T', ' ')}Z",
                          subtitle=f"{maps.STYLE[v]['label']}  ·  valid times are in the future: no verification yet, compare the models by eye")
+if "quickstart" in stage:     # README hero: one call, four models, scored against ERA5
+    c = cached("quickstart", lambda: wp.compare(["graphcast", "pangu", "gefs", "ifs-hres"], "z500,t2m", "7d", init=INIT))
+    c.summary().round(3).to_csv(RES / f"{INIT}_quickstart_scores.csv", index=False)
+    c.plot(str(IMG / "quickstart_scores.png"), title=f"wp.compare(['graphcast', 'pangu', 'gefs', 'ifs-hres'], 'z500,t2m', '7d', init='{INIT}')")
+    c.plot_maps(str(IMG / "quickstart_z500_maps.png"), "z500", 120)
+    print(c); print(c.ranking())
+if "s2s" in stage:            # S2S: every Monday/Thursday init of October 2020, weeks 1-6, vs ERA5 weekly means
+    S2S_MODELS = ["ifs-ext", "gefs", "cfsv2", "persistence", "climatology"]
+    def run_s2s():
+        c = wp.compare(S2S_MODELS, "t2m,z500,tp", "6w", init="2020-10-01..2020-10-29")
+        c.forecasts = {m: d.load() for m, d in c.forecasts.items()}; return c
+    c = cached("s2s_oct2020", run_s2s)
+    c.scores.round(4).to_csv(RES / "s2s_2020-10_scores_per_init.csv", index=False)
+    c.summary().round(3).to_csv(RES / "s2s_2020-10_scores.csv", index=False)
+    c.plot(str(IMG / "s2s_2020-10_scores.png"), title=f"S2S weekly means: {len(c.inits)} inits, Oct 2020 (Mon/Thu), scored vs ERA5")
+    for wk in (1, 3):
+        c.plot_maps(str(IMG / f"s2s_2020-10-01_week{wk}_t2m.png"), "t2m", wk)
+    print(c); print(c.ranking("acc")); print("skipped:", c.skipped)

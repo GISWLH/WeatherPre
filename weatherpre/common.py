@@ -43,3 +43,13 @@ def gcs_open(path: str):
     return xr.open_zarr(fs.get_mapper(path.replace("gs://", "")), chunks=None, decode_timedelta=True)
 
 
+
+def cfgrib():
+    """Import cfgrib after pyproj: the eccodeslib wheel loaded before PROJ makes the interpreter crash at exit
+    ('double free or corruption') once pyproj/cartopy is imported later."""
+    try:
+        import pyproj  # noqa: F401
+    except ImportError:
+        pass
+    import cfgrib as _c
+    return _c
