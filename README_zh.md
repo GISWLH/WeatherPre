@@ -64,7 +64,23 @@ weatherpre compare ifs-ext,gefs,cfsv2,climatology t2m 6w --init 2020-10-01
 ## 📊 精度示例
 
 <!-- S2S:START -->
-S2S_PLACEHOLDER
+**S2S 尺度：2020 年 10 月所有周一/周四起报（9 次），第 1–6 周，周平均对 ERA5**：
+
+```python
+cmp = wp.compare(["ifs-ext", "gefs", "cfsv2", "persistence", "climatology"], "t2m,z500,tp", "6w", init="2020-10-01..2020-10-29")
+```
+
+| t2m ACC（周平均距平） | 第1周 | 第2周 | 第3周 | 第4周 | 第5周 | 第6周 |
+|---|---:|---:|---:|---:|---:|---:|
+| ECMWF 延伸期（集合平均） | **0.84** | **0.64** | 0.41 | 0.36 | 0.41 | **0.41** |
+| NOAA GEFS（集合平均，至 35 天） | 0.77 | 0.58 | **0.42** | **0.40** | **0.44** | – |
+| NOAA CFSv2（成员 1） | 0.74 | 0.45 | 0.20 | 0.22 | 0.24 | 0.17 |
+| ERA5 距平持续 | 0.54 | 0.37 | 0.37 | 0.27 | 0.22 | 0.24 |
+
+第 2 周之后技巧迅速下降：第 3 周起集合平均的 t2m ACC 约 0.4，但 RMSE 仅略低于气候态，z500 ACC 降到 0.1–0.3；未订正的单个 CFSv2 成员的 t2m 不如持续预报。完整数据：[`results/examples/s2s_2020-10_scores.csv`](results/examples/s2s_2020-10_scores.csv)。
+
+<img src="docs/img/s2s_2020-10_scores.png" width="100%">
+<img src="docs/img/s2s_2020-10-01_week3_t2m.png" width="100%">
 <!-- S2S:END -->
 
 更多（2020-10-03 起报的未来 48 小时 / 一周 / 15 天、最新实时循环）：[docs/EXAMPLES.md](docs/EXAMPLES.md)。

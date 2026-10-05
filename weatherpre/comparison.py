@@ -70,14 +70,20 @@ class Comparison:
         from .maps import plot_skill
         return plot_skill(self.summary(), out, self.scale, self.variables, title or self._title())
 
+    def _first_init(self):
+        """Scores of the init whose forecasts are kept (the maps show that init)."""
+        if not len(self.scores): return self.summary()
+        one = Comparison(self.scale, self.variables, self.leads, {}, self.scores[self.scores["init"] == self.inits[0]], self.truth)
+        return one.summary()
+
     def plot_maps(self, out="maps.png", variable=None, lead=None):
         from . import maps
         v = variable or self.variables[0]
         if self.scale == C.S2S:
             wk = lead or int(max(self.leads.weeks))
-            return maps.plot_s2s(self.forecasts, v, wk, out=out, scores=self.summary())
+            return maps.plot_s2s(self.forecasts, v, wk, out=out, scores=self._first_init())
         h = lead or int(max(self.leads.hours))
-        tab = self.summary()
+        tab = self._first_init()
         tab = tab[tab.variable == v].rename(columns={"rmse": f"{v}_rmse"}) if len(tab) else None
         return maps.plot_models(self.forecasts, v, h, None, out, title=f"Model comparison · +{h} h · {self._title()}", scores=tab)
 

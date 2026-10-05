@@ -84,7 +84,31 @@ Variables: `z500` [m], `t850` [K], `t2m` [K], `msl` [hPa], `tp` [mm, accumulated
 ## 📊 Accuracy at a glance
 
 <!-- S2S:START -->
-S2S_PLACEHOLDER
+**S2S scale: weeks 1–6, every Monday/Thursday init of October 2020 (9 inits), weekly means vs ERA5** — one call:
+
+```python
+cmp = wp.compare(["ifs-ext", "gefs", "cfsv2", "persistence", "climatology"], "t2m,z500,tp", "6w", init="2020-10-01..2020-10-29")
+```
+
+| t2m ACC (weekly mean anomaly) | wk 1 | wk 2 | wk 3 | wk 4 | wk 5 | wk 6 |
+|---|---:|---:|---:|---:|---:|---:|
+| ECMWF extended range (ens. mean) | **0.84** | **0.64** | 0.41 | 0.36 | 0.41 | **0.41** |
+| NOAA GEFS (ens. mean, to 35 d) | 0.77 | 0.58 | **0.42** | **0.40** | **0.44** | – |
+| NOAA CFSv2 (member 1) | 0.74 | 0.45 | 0.20 | 0.22 | 0.24 | 0.17 |
+| ERA5 anomaly persistence | 0.54 | 0.37 | 0.37 | 0.27 | 0.22 | 0.24 |
+
+| t2m RMSE [K] | wk 1 | wk 2 | wk 3 | wk 4 | wk 5 | wk 6 |
+|---|---:|---:|---:|---:|---:|---:|
+| ECMWF extended range | **0.89** | **1.41** | **1.81** | **1.95** | **1.94** | **2.04** |
+| NOAA GEFS | 1.21 | 1.59 | 1.86 | 1.97 | 2.00 | – |
+| climatology | 1.89 | 1.91 | 1.97 | 2.04 | 2.10 | 2.22 |
+| NOAA CFSv2 | 1.31 | 2.01 | 2.52 | 2.57 | 2.65 | 2.82 |
+| persistence | 1.83 | 2.16 | 2.19 | 2.39 | 2.52 | 2.58 |
+
+Skill drops fast after week 2: from week 3 on the ensemble means keep a t2m ACC around 0.4 but their RMSE is barely below climatology, and z500 ACC falls to 0.1–0.3. A single, non-bias-corrected CFSv2 member does worse than persistence for t2m. All numbers (z500, tp, per init): [`results/examples/s2s_2020-10_scores.csv`](results/examples/s2s_2020-10_scores.csv).
+
+<img src="docs/img/s2s_2020-10_scores.png" width="100%">
+<img src="docs/img/s2s_2020-10-01_week3_t2m.png" width="100%">
 <!-- S2S:END -->
 
 **Weather scale, 2020-10-03 00Z, next 7 days** (`wp.compare(["graphcast","pangu","gefs","ifs-hres"], "z500,t2m", "7d", init="2020-10-03")`, vs ERA5, 1.5°):
