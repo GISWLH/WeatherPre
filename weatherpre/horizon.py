@@ -31,6 +31,14 @@ def compare(models="auto", init="latest", preset="week", cache=None, truth="auto
             fc[m] = api.forecast(m, init, preset=preset, cache=cache, verbose=verbose)
         except Exception as e:                                       # keep going, report below
             skipped[m] = f"{type(e).__name__}: {str(e)[:160]}"
+    inits = {m: np.datetime64(d.init_time.values, "h") for m, d in fc.items()}
+    if len(set(inits.values())) > 1:                 # "latest" differs per provider: align every model on the oldest cycle
+        t_common = min(inits.values())
+        for m in [m for m, t in inits.items() if t != t_common]:
+            try:
+                fc[m] = api.forecast(m, str(t_common), preset=preset, cache=cache, verbose=verbose)
+            except Exception as e:
+                skipped[m] = f"{type(e).__name__}: {str(e)[:160]}"; fc.pop(m)
     for name, d in (extra or {}).items():            # forecasts produced elsewhere (e.g. HF/Colab Aurora), cut to this preset
         L = [h for h in api.PRESETS[preset] if h in d.lead.values]
         if L: fc[name] = d.sel(lead=L)
