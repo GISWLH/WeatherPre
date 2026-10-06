@@ -10,7 +10,7 @@ def _std(da: xr.DataArray) -> xr.DataArray:
     return da
 
 def read(files, init) -> xr.Dataset:
-    import cfgrib
+    from .common import cfgrib as _cg; cfgrib = _cg()
     warnings.filterwarnings("ignore")
     rows = {}   # (var) -> {lead_hours: DataArray}
     for f in files:

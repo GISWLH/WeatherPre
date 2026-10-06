@@ -18,11 +18,16 @@ plt.rcParams.update({"font.family": ["Liberation Sans", "DejaVu Sans"], "font.si
 # one fixed colour per model across every figure (validated 8-slot categorical order); NWP drawn dashed
 MODEL_COLORS = {"graphcast": "#2a78d6", "pangu": "#eb6834", "fuxi": "#1baf7a", "gencast": "#eda100",
                 "neuralgcm": "#e87ba4", "aurora": "#008300", "ifs-ens": "#4a3aa7", "ifs-hres": "#e34948",
-                "aifs-single": "#2a78d6", "aigfs": "#1baf7a", "gfs": "#4a3aa7"}
-NWP = {"ifs-hres", "ifs-ens", "gfs"}
+                "aifs-single": "#2a78d6", "aigfs": "#1baf7a", "gfs": "#4a3aa7", "gefs": "#7d5ba6",
+                "ifs-ext": "#e34948", "cfsv2": "#4a3aa7", "persistence": "#8a8984", "climatology": "#b8b7b2",
+                "fcn3": "#76b900", "aifs2": "#1f5fa8", "aurora-1.5": "#2f9e44", "atlas": "#5c940d", "ucast": "#c2255c",
+                "fuxi-s2s": "#1baf7a", "dlesym": "#0b7285", "ace2": "#e67700", "weathernext2": "#eda100"}
+NWP = {"ifs-hres", "ifs-ens", "gfs", "gefs", "ifs-ext", "cfsv2"}
+BASELINE = {"persistence", "climatology"}
 LABELS = {"ifs-hres": "IFS HRES", "hres": "IFS HRES", "ifs-ens": "IFS ENS mean", "graphcast": "GraphCast", "pangu": "Pangu-Weather",
           "fuxi": "FuXi", "gencast": "GenCast mean", "neuralgcm": "NeuralGCM", "aurora": "Aurora",
-          "aifs-single": "AIFS", "aigfs": "AIGFS", "gfs": "GFS", "era5": "ERA5"}
+          "aifs-single": "AIFS", "aigfs": "AIGFS", "gfs": "GFS", "era5": "ERA5", "gefs": "GEFS mean",
+          "ifs-ext": "ECMWF ext. range", "cfsv2": "CFSv2", "persistence": "Persistence", "climatology": "Climatology"}
 
 def _cmap(colors, name):
     return mcolors.LinearSegmentedColormap.from_list(name, colors)
@@ -44,7 +49,16 @@ STYLE = {
     "tp": dict(label="precipitation since init [mm]", levels=[2, 5, 10, 25, 50, 100, 200, 400], cmap=TP,
                contour=None, extend="max", under="white"),
 }
-RMSE_UNIT = {"z500": "m", "t850": "K", "t2m": "K"}
+RMSE_UNIT = {"z500": "m", "t850": "K", "t2m": "K", "msl": "hPa", "tp": "mm/day"}
+ANOM = _cmap(["#1d2f6f", "#3164a8", "#6fa3cf", "#c5dbe9", "#f7f7f5", "#f4cfae", "#e3895d", "#bd3f32", "#6e1426"], "anom")
+WETDRY = _cmap(["#8c510a", "#bf812d", "#dfc27d", "#f6e8c3", "#f7f7f5", "#c7eae5", "#80cdc1", "#35978f", "#01665e"], "wetdry")
+STYLE.update({   # S2S: weekly-mean anomalies vs the ERA5 1990-2017 weekly climatology
+    "z500_anom": dict(label="500 hPa height anomaly, weekly mean [dam]", scale=0.1, levels=np.arange(-12, 13, 2), cmap=ANOM, contour=None, extend="both"),
+    "t850_anom": dict(label="850 hPa temperature anomaly, weekly mean [K]", levels=np.arange(-6, 6.1, 1), cmap=ANOM, contour=None, extend="both"),
+    "t2m_anom": dict(label="2 m temperature anomaly, weekly mean [K]", levels=np.arange(-6, 6.1, 1), cmap=ANOM, contour=None, extend="both"),
+    "msl_anom": dict(label="sea-level pressure anomaly, weekly mean [hPa]", levels=np.arange(-12, 13, 2), cmap=ANOM, contour=None, extend="both"),
+    "tp_anom": dict(label="precipitation anomaly, weekly mean [mm/day]", levels=np.arange(-5, 5.1, 1), cmap=WETDRY, contour=None, extend="both"),
+})
 
 def _wrap(x):
     """lon 0..360 -> -180..180 (cartopy needs a monotonic, non-wrapping axis); south of the cut is dropped."""
@@ -132,6 +146,10 @@ def _cbar(fig, cax_rect, im, var, orientation="horizontal"):
     return cb
 
 def _name(m): return LABELS.get(m, m)
+def _color(m, i=0):
+    pal = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948"]
+    return MODEL_COLORS.get(m, pal[i % len(pal)])
+def _dash(m): return (0, (1, 1.6)) if m in BASELINE else (0, (4, 2)) if m in NWP else "-"
 def _valid(ds, h): return np.datetime_as_string(ds.valid_time.sel(lead=h).values, unit="h").replace("T", " ") + "Z"
 def _init(ds):
     return np.datetime_as_string(np.datetime64(ds.init_time.values), unit="h").replace("T", " ") + "Z" if "init_time" in ds.coords else str(ds.attrs.get("init"))
@@ -215,5 +233,74 @@ def plot_scores(table, out, title="", fields=("z500", "t850", "t2m"), subtitle=N
     fig.text(0.06, 0.97, title, fontsize=13, fontweight="bold", color=INK, va="top")
     fig.text(0.06, 0.905, subtitle or "area-weighted RMSE (WeatherBench-X) · solid = AI, dashed = NWP · lower is better",
              fontsize=8.5, color=INK2, va="top")
+    fig.savefig(out, dpi=150); plt.close(fig)
+    return out
+
+
+def plot_skill(summary, out, scale="weather", variables=("z500", "t2m"), title="", subtitle=None):
+    """Tidy summary (model, variable, lead_h|week, rmse, acc) -> rows = metrics, columns = variables.
+    Solid = AI, dashed = NWP, dotted = baseline."""
+    x = "week" if scale == "s2s" else "lead_h"
+    variables = [v for v in variables if v in set(summary.variable)]
+    metrics = [m for m in ("rmse", "acc") if m in summary and summary[summary.variable.isin(variables)][m].notna().any()]
+    fig, axs = plt.subplots(len(metrics), len(variables), figsize=(3.9 * len(variables) + 0.6, 3.0 * len(metrics) + 1.2), squeeze=False)
+    fig.subplots_adjust(left=0.07, right=0.98, top=1 - 1.15 / (3.0 * len(metrics) + 1.2), bottom=0.1, wspace=0.25, hspace=0.45)
+    models = list(dict.fromkeys(summary.model)); handles = {}
+    for i, met in enumerate(metrics):
+        for j, v in enumerate(variables):
+            ax = axs[i][j]
+            for k, m in enumerate(models):
+                d = summary[(summary.model == m) & (summary.variable == v)].sort_values(x)
+                if not d[met].notna().any(): continue
+                xs = d[x] if x == "week" else d[x] / 24
+                ln, = ax.plot(xs, d[met], color=_color(m, k), lw=1.8, ls=_dash(m), marker="o", ms=3.2, mec="white", mew=0.6, zorder=3)
+                handles[m] = ln
+            unit = f" [{RMSE_UNIT.get(v, '')}]" if met == "rmse" else ""
+            ax.set_title(f"{v} {met.upper()}{unit}", loc="left", fontsize=9.5, fontweight="bold", color=INK)
+            ax.set_xlabel("week" if x == "week" else "lead time [days]", fontsize=8.5)
+            if x == "week": ax.set_xticks(sorted(set(summary[x])))
+            ax.grid(axis="y", color=RULE, lw=0.6); ax.set_axisbelow(True)
+            if met == "rmse": ax.set_ylim(bottom=0)
+            else: ax.axhline(0.6 if x == "lead_h" else 0, color=INK3, lw=0.6, ls=":")
+            ax.tick_params(length=0, labelsize=8)
+            for sp in ("top", "right", "left"): ax.spines[sp].set_visible(False)
+    H = fig.get_figheight()
+    fig.legend(handles.values(), [_name(m) for m in handles], loc="upper left", bbox_to_anchor=(0.06, 1 - 0.62 / H),
+               ncol=min(len(handles), 7), frameon=False, fontsize=8.5, handlelength=2.2, columnspacing=1.2)
+    fig.text(0.07, 1 - 0.12 / H, title, fontsize=12.5, fontweight="bold", color=INK, va="top")
+    fig.text(0.07, 1 - 0.40 / H, subtitle or ("area-weighted RMSE / ACC (WeatherBench-X) · RMSE lower is better, ACC higher is better · "
+             "solid = AI, dashed = NWP, dotted = baseline"), fontsize=8.3, color=INK2, va="top")
+    fig.savefig(out, dpi=150); plt.close(fig)
+    return out
+
+def plot_s2s(dsets: dict, var="t2m", week=3, out="s2s.png", truth=True, scores=None, title=None):
+    """Weekly-mean anomaly maps, one panel per model (+ ERA5 when the week is in the past)."""
+    from . import s2s
+    st = f"{var}_anom"
+    panels = []
+    first = next(iter(dsets.values()))
+    start = np.datetime64(first.valid_start.sel(week=week).values, "D")
+    if truth and start <= s2s.ERA5_WEEKLY_LAST:
+        try: panels.append(("era5", s2s.era5_anomaly(start, var)))
+        except Exception: pass
+    for m, d in dsets.items():
+        if var in d and week in d.week.values and m != "climatology":
+            panels.append((m, s2s.anomaly(d)[var].sel(week=week)))
+    acc = {}
+    if scores is not None and len(scores) and "acc" in scores:
+        s = scores[(scores.variable == var) & (scores.week == week)].set_index("model")["acc"].dropna(); acc = s.to_dict()
+    if acc: panels = panels[:1] + sorted(panels[1:], key=lambda p: -acc.get(p[0], -9)) if panels and panels[0][0] == "era5" else sorted(panels, key=lambda p: -acc.get(p[0], -9))
+    n = len(panels); cols = 2 if n <= 4 else 3; rows = int(np.ceil(n / cols))
+    fig, rects, (W, H) = _layout(rows, cols, panel_w=4.2, foot=0.62, gap_h=0.2)
+    cmap, norm = _norm(st)
+    for i, (name, da) in enumerate(panels):
+        ax, im = _map(fig, rects[i], _wrap(da), st, cmap, norm)
+        right = "observed" if name == "era5" else (f"ACC {acc[name]:.2f}" if name in acc else ("NWP" if name in NWP else "AI"))
+        _panel_title(fig, rects[i], _name(name), right, color=None if name == "era5" else _color(name, i))
+    x0 = rects[0][0]; x1 = rects[cols - 1][0] + rects[cols - 1][2]; cw = 0.6 * (x1 - x0)
+    _cbar(fig, (x0 + (x1 - x0 - cw) / 2, 0.36 / H, cw, 0.11 / H), im, st)
+    end = start + np.timedelta64(6, "D")
+    _header(fig, title or f"Week {week} outlook · {str(start)} – {str(end)}",
+            f"{STYLE[st]['label']} vs ERA5 1990–2017 weekly climatology · init {_init(first)}", H)
     fig.savefig(out, dpi=150); plt.close(fig)
     return out

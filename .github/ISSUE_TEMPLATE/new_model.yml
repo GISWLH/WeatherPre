@@ -1,0 +1,21 @@
+name: Add a model
+description: Propose a weather / S2S model or a hosted forecast feed
+labels: ["model"]
+body:
+  - type: input
+    id: name
+    attributes: {label: Model name, placeholder: "e.g. FourCastNet 3"}
+    validations: {required: true}
+  - type: dropdown
+    id: scale
+    attributes: {label: Scale, options: ["weather (<= 15 days)", "S2S (> 15 days)", "both"]}
+    validations: {required: true}
+  - type: textarea
+    id: route
+    attributes:
+      label: Open route
+      description: Hosted data (bucket / API), Earth2Studio class, pip package, HF weights ... and the licence.
+    validations: {required: true}
+  - type: input
+    id: paper
+    attributes: {label: Paper / model card}

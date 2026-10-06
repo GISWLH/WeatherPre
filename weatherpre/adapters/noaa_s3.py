@@ -5,7 +5,6 @@
 from __future__ import annotations
 import datetime as dt, re, urllib.request, urllib.error
 from pathlib import Path
-import numpy as np, xarray as xr
 
 AIGFS_B = "https://noaa-nws-graphcastgfs-pds.s3.amazonaws.com"
 GFS_B = "https://noaa-gfs-bdp-pds.s3.amazonaws.com"

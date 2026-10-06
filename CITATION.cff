@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+message: "If you use WeatherPre, please cite it as below, and cite the models and datasets you used."
+title: "WeatherPre: one-call weather and S2S forecasts from AI and NWP models with built-in verification"
+authors:
+  - family-names: Wang
+    given-names: Longhao
+repository-code: "https://github.com/GISWLH/WeatherPre"
+license: Apache-2.0
+version: 0.3.0
+date-released: 2026-10-05
+keywords: [weather forecasting, subseasonal-to-seasonal, machine learning, WeatherBench, Earth2Studio]

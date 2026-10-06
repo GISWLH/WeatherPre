@@ -1,13 +1,45 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "weatherpre"
-version = "0.1.0"
-description = "Near-real-time forecasts from frontier weather AI models, assembled from existing hosted data and frameworks"
+version = "0.3.0"
+description = "One-call weather (<=15 d) and S2S (>15 d) forecasts from frontier AI + NWP models, with built-in accuracy comparison"
+readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Apache-2.0" }
-dependencies = ["numpy", "pandas", "xarray", "zarr", "gcsfs", "netCDF4", "matplotlib", "cartopy", "shapely",
+authors = [{ name = "Longhao Wang (GISWLH)" }]
+keywords = ["weather", "forecast", "ai-weather", "s2s", "subseasonal", "graphcast", "aifs", "aurora", "earth2studio",
+            "weatherbench", "climate", "meteorology", "xarray"]
+classifiers = [
+  "Development Status :: 4 - Beta", "Intended Audience :: Science/Research", "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3", "Programming Language :: Python :: 3.11", "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: Atmospheric Science",
+]
+dependencies = ["numpy", "pandas", "xarray", "zarr", "gcsfs", "netCDF4", "matplotlib", "cartopy", "shapely", "scipy",
                 "robinson-lat-clip @ git+https://github.com/GISWLH/cartopy-robinson-lat-clip.git", "cfgrib", "eccodes",
                 "ecmwf-opendata", "weatherbenchX @ git+https://github.com/google-research/weatherbenchX.git"]
+
+[project.optional-dependencies]
+hf = ["gradio_client", "huggingface_hub"]              # Aurora on the HF ZeroGPU Space
+gpu = ["earth2studio>=0.19"]                           # + the per-model extra, e.g. earth2studio[fcn3]
+dev = ["pytest", "ruff"]
+
+[project.urls]
+Homepage = "https://github.com/GISWLH/WeatherPre"
+Issues = "https://github.com/GISWLH/WeatherPre/issues"
+
 [project.scripts]
 weatherpre = "weatherpre.cli:main"
+
 [tool.setuptools.packages.find]
 include = ["weatherpre*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 140
+[tool.ruff.lint]
+select = ["F"]          # pyflakes only: the code base uses compact one-line statements on purpose

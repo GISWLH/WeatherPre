@@ -11,7 +11,7 @@ import numpy as np, xarray as xr
 from .common import gcs_open
 from weatherbenchX import aggregation, weighting
 from weatherbenchX.data_loaders import xarray_loaders as xl
-from weatherbenchX.metrics import base as mbase, deterministic
+from weatherbenchX.metrics import deterministic
 
 # fields we report: label -> (WB2 variable, selection)
 FIELDS = {
@@ -19,6 +19,7 @@ FIELDS = {
     "t850": ("temperature", {"level": 850}),
     "t2m": ("2m_temperature", {}),
     "msl": ("mean_sea_level_pressure", {}),
+    "tp": ("total_precipitation_24hr", {}),          # S2S weekly means only (m/day)
 }
 
 def _loader(cls, src, var, sel, **kw):
@@ -47,5 +48,7 @@ def evaluate(pred_src, target_src, init_times, lead_hours, fields=("z500", "t850
         for k in res.data_vars:
             name = str(k)
             kind = "acc" if "acc" in name.lower() else "rmse"
-            out[f"{f}_{kind}"] = res[k].squeeze(drop=True).drop_vars("level", errors="ignore")
+            da = res[k]
+            da = da.squeeze([d for d in da.dims if d != "lead_time" and da.sizes[d] == 1], drop=True)
+            out[f"{f}_{kind}"] = da.drop_vars("level", errors="ignore")
     return xr.Dataset(out)

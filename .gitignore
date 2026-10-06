@@ -10,3 +10,7 @@ results/**/*.nc
 __pycache__/
 .hf_token
 .env
+*.egg-info/
+.venv/
+.pytest_cache/
+.ruff_cache/

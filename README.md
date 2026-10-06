@@ -1,181 +1,213 @@
-# WeatherPre
+<div align="center">
 
-**Near-real-time & forward forecasts from frontier AI weather models: one call, any model, any date. Assembled from hosted data, upstream packages and WeatherBench-X, nothing re-implemented.**
+# 🌦️ WeatherPre
 
-近实时 / 前向预报：一行代码、指定模型和起报日期。只组装托管数据、官方推理库和 WeatherBench-X，不重复造轮子。
+**One line to forecast. One line to compare.**<br>
+Weather (≤ 15 days) and sub-seasonal-to-seasonal (> 15 days) forecasts from 28 AI and NWP models (+ 2 baselines) (GraphCast, AIFS, Aurora, FourCastNet 3, GEFS, ECMWF extended range, CFSv2 …), scored against ERA5 with WeatherBench-X.
 
-Route order / 路线优先级：**① hosted data 托管数据 → ② upstream package on GPU (HF / Colab) → ③ our port [`GISWLH/WeatherAI`](https://github.com/GISWLH/WeatherAI)** · [`docs/SURVEY.md`](docs/SURVEY.md) · [`docs/RESULTS.md`](docs/RESULTS.md) · [`docs/GPU.md`](docs/GPU.md)
+[![CI](https://github.com/GISWLH/WeatherPre/actions/workflows/ci.yml/badge.svg)](https://github.com/GISWLH/WeatherPre/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)
+[![License](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
+![Models](https://img.shields.io/badge/models-28%20%2B%202%20baselines-orange)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/GISWLH/WeatherPre/blob/main/notebooks/colab_earth2studio.ipynb)
 
-## Quick start / 快速开始
+[English](README.md) · [中文](README_zh.md) · [Examples](docs/EXAMPLES.md) · [Survey](docs/SURVEY.md) · [GPU routes](docs/GPU.md) · [Contributing](CONTRIBUTING.md)
 
-```bash
-pip install -e .            # Python >= 3.11
-weatherpre forecast graphcast 2020-10-03 --days 15 --plot     # CLI -> data/forecasts/*.nc + png
-weatherpre forecast aifs latest --days 15 --plot               # newest ECMWF Open Data cycle
-weatherpre horizon 2020-10-03 --preset week --out results/x    # multi-model table + plots
-```
+<img src="docs/img/quickstart_scores.png" width="88%">
+
+</div>
 
 ```python
 import weatherpre as wp
 
-ds = wp.forecast("aifs", init="latest", lead_days=15)           # xarray.Dataset (lead, latitude, longitude)
-ds = wp.forecast("graphcast", init="2020-10-03", lead_days=7)   # 2020 -> hosted WeatherBench 2
-ds = wp.forecast("ifs", init="2020-10-03", lead_hours=[6, 12, 24, 48])
-ds = wp.forecast("aurora", init="2020-10-03", lead_days=15)     # 0.25 deg, runs on HF ZeroGPU (HF_TOKEN)
-
-ds.z500.isel(lead=2).plot()                                     # z500 [m]; also t850, t2m, msl [hPa], tp [mm] if available
-wp.plot_maps(ds, ("z500", "t2m"), [24, 120, 240], "maps.png")   # Robinson maps cut at 60°S, labelled model / init / lead
-fc, table, info = wp.compare("auto", "2020-10-03", preset="week")   # all suitable models + RMSE table
+ds  = wp.forecast("graphcast", "z500", "7d", init="2020-10-03")            # model, variable, horizon -> xarray
+cmp = wp.compare(["graphcast", "pangu", "gefs", "ifs"], "z500,t2m", "7d", init="2020-10-03")
+cmp.ranking()                                                               # who wins, scored vs ERA5
 ```
 
-`lead_hours=[..]` | `lead_days=N` (24 h steps) | `preset="hours"` (6..48 h, 6 h) / `"week"` (12..168 h, 12 h) / `"15days"` (24..360 h, 24 h). `init` = date, `YYYY-MM-DDTHH` or `"latest"`. Variables: `z500` [m], `t850` [K], `t2m` [K], `msl` [hPa], `tp` [mm, ECMWF models]; coords `lead` [h], `valid_time`, scalar `init_time`.
+## ✨ Why WeatherPre
 
-### Backend auto-selection / 自动选路
+* **Model × variable × horizon → result.** No GRIB plumbing, no regridding, no per-model APIs: one `xarray.Dataset` with the same names and units for every model.
+* **Two forecast scales, one interface.** `"48h"`, `"7d"`, `"15d"` → *weather* (fields at lead hours); `"6w"`, `"45d"`, `"week3-4"` → *S2S* (weekly means and anomalies).
+* **Accuracy built in.** `wp.compare(...)` scores every model on the same grid with [WeatherBench-X](https://github.com/google-research/weatherbenchX) (area-weighted RMSE and ACC; ERA5 for the past, IFS analysis for recent cycles), averages over many inits, ranks the models and draws the figures.
+* **No GPU needed for 13 models + 2 baselines.** Hosted forecasts are streamed from WeatherBench 2, ECMWF Open Data and NOAA's open buckets. GPU models (AIFS v2, Aurora 1.5, FourCastNet 3, Atlas, U-CAST, WeatherNext 2, FuXi-S2S …) run through [NVIDIA Earth2Studio](https://github.com/NVIDIA/earth2studio) or a Hugging Face ZeroGPU Space with **the same call**.
+* **Nothing re-implemented.** Every route wraps an upstream product or package, so you get the official numbers.
+* **Publication-ready figures.** Robinson maps, skill curves and S2S anomaly panels in one call.
 
-| Request | Backend | Notes |
+## 🚀 Install
+
+```bash
+pip install "weatherpre @ git+https://github.com/GISWLH/WeatherPre"      # Python >= 3.11
+pip install "weatherpre[gpu] @ git+https://github.com/GISWLH/WeatherPre" "earth2studio[fcn3]"   # optional: GPU models
+```
+
+## ⚡ Quick start
+
+```python
+import weatherpre as wp
+
+# weather scale (<= 15 days): fields at lead hours
+ds = wp.forecast("aifs", "t2m", "15d")                                   # latest ECMWF AIFS cycle, 0.25°
+ds = wp.forecast("gefs", ["z500", "tp"], "48h", init="2020-10-03")       # NOAA GEFS ensemble mean
+ds = wp.forecast("aurora", "msl", "7d", init="2020-10-03")               # GPU: HF ZeroGPU (HF_TOKEN) or Earth2Studio
+ds = wp.forecast("e2s:FCN3", "t2m", "7d", init="2020-10-03")             # any Earth2Studio model by class name
+
+# S2S scale (> 15 days): weekly means, week k = days 7(k-1)..7k after init
+s = wp.forecast("ifs-ext", "t2m", "6w", init="2020-10-01")               # ECMWF extended range, weeks 1-6
+s = wp.forecast("cfsv2", "tp", "week3-4")                                # latest CFSv2, weeks 3-4
+wp.anomaly(s)                                                            # vs ERA5 1990-2017 weekly climatology
+
+# accuracy comparison
+cmp = wp.compare("auto", "z500", "15d", init="2020-10-03")               # best hosted models for that date
+cmp = wp.compare(["ifs-ext", "gefs", "cfsv2", "persistence", "climatology"], "t2m", "6w",
+                 init="2020-10-01..2020-10-29")                          # every Mon/Thu init, scores averaged
+cmp.table("acc"); cmp.ranking(); cmp.plot("scores.png"); cmp.plot_maps("week3.png", "t2m", 3)
+```
+
+Same thing from the shell:
+
+```bash
+weatherpre models --scale s2s                                 # what can I run? (--all adds GPU models)
+weatherpre forecast graphcast z500 7d --init 2020-10-03 --plot
+weatherpre compare ifs-ext,gefs,cfsv2,climatology t2m 6w --init 2020-10-01   # table + ranking + figures
+```
+
+| `lead=` | scale | what you get |
 |---|---|---|
-| `init="latest"`, `aifs` / `ifs` | ECMWF Open Data | last ~4 days only, 00/12Z to 360 h, 06/18Z to ~144 h |
-| `init="latest"`, `aigfs` / `gfs` | NOAA S3 | to 384 h |
-| 2018–22 date, `hres graphcast pangu fuxi gencast neuralgcm ifs-ens` | WeatherBench 2 (hosted) | 00/12Z inits, 1.5°, lead limits below |
-| any date, `aurora` | HF ZeroGPU Space (upstream `microsoft-aurora`) | ERA5 initial conditions up to 2021, IFS analysis after |
-| 2020 date, `aifs` / `aigfs` / `gfs` | **raises `BackendUnavailable`** with the options | no hosted archive; AIFS needs Earth2Studio on a Py >= 3.11 GPU ([Colab](notebooks/colab_earth2studio.ipynb), not run) |
+| `"48h"` · `"7d"` · `"15d"` | weather | `dims (lead, latitude, longitude)`; leads every 6 h to 48 h, 12 h to 7 d, 24 h to 15 d |
+| `24` · `[6, 12, 24]` · `"24,48,72"` | weather | exactly these lead hours |
+| `"6w"` · `"45d"` · `"2m"` · `"s2s"` | S2S | `dims (week, latitude, longitude)`, weeks 1..N, weekly means (`tp` in mm/day) |
+| `"week3-4"` · `"w3"` | S2S | only those weeks |
 
-## Now = 2020-10-03: what to expect next / 前向预报示例
+Variables: `z500` [m], `t850` [K], `t2m` [K], `msl` [hPa], `tp` [mm, accumulated since init; mm/day for S2S] (aliases like `"precip"`, `"mslp"`, `"T2M"` work). `init`: date, `"YYYY-MM-DDTHH"`, `"latest"`, a list, or `"START..END"` for `compare`.
 
-"It is 2020-10-03 00Z, give me the next hours / week / 15 days." Best hosted models per horizon are picked by `wp.best_models(init, preset)`. All numbers below are real runs (`scripts/make_examples.py`), scored against ERA5 (WeatherBench 2) with WeatherBench-X (area-weighted RMSE). For a past date this is a **hindcast check**; for a real "now" the valid times are in the future and **cannot be scored**.
+## 📊 Accuracy at a glance
 
-### Next 48 h / 未来 6–48 小时 (`preset="hours"`)
+<!-- S2S:START -->
+**S2S scale: weeks 1–6, every Monday/Thursday init of October 2020 (9 inits), weekly means vs ERA5** — one call:
 
-Ran: `fuxi` (≤48 h), `gencast` (≤48 h), `graphcast` (≤48 h), `ifs-hres` (≤48 h), `neuralgcm` (≤48 h), `pangu` (≤48 h).
+```python
+cmp = wp.compare(["ifs-ext", "gefs", "cfsv2", "persistence", "climatology"], "t2m,z500,tp", "6w", init="2020-10-01..2020-10-29")
+```
 
-![hours maps](docs/img/2020-10-03_hours_z500_models.png)
-![hours scores](docs/img/2020-10-03_hours_scores.png)
+| t2m ACC (weekly mean anomaly) | wk 1 | wk 2 | wk 3 | wk 4 | wk 5 | wk 6 |
+|---|---:|---:|---:|---:|---:|---:|
+| ECMWF extended range (ens. mean) | **0.84** | **0.64** | 0.41 | 0.36 | 0.41 | **0.41** |
+| NOAA GEFS (ens. mean, to 35 d) | 0.77 | 0.58 | **0.42** | **0.40** | **0.44** | – |
+| NOAA CFSv2 (member 1) | 0.74 | 0.45 | 0.20 | 0.22 | 0.24 | 0.17 |
+| ERA5 anomaly persistence | 0.54 | 0.37 | 0.37 | 0.27 | 0.22 | 0.24 |
 
-| z500 RMSE [m] | +6 h | +12 h | +24 h | +48 h |
-|---|---:|---:|---:|---:|
-| fuxi | 1.6 | **2.7** | 4.2 | 8.3 |
-| gencast | – | 2.9 | 3.9 | 7.7 |
-| graphcast | **1.4** | 2.8 | 4.0 | 7.7 |
-| ifs-hres | 2.3 | 3.6 | 4.7 | 9.2 |
-| neuralgcm | – | 3.0 | **3.8** | **7.1** |
-| pangu | 1.5 | 3.0 | 4.5 | 7.3 |
+| t2m RMSE [K] | wk 1 | wk 2 | wk 3 | wk 4 | wk 5 | wk 6 |
+|---|---:|---:|---:|---:|---:|---:|
+| ECMWF extended range | **0.89** | **1.41** | **1.81** | **1.95** | **1.94** | **2.04** |
+| NOAA GEFS | 1.21 | 1.59 | 1.86 | 1.97 | 2.00 | – |
+| climatology | 1.89 | 1.91 | 1.97 | 2.04 | 2.10 | 2.22 |
+| NOAA CFSv2 | 1.31 | 2.01 | 2.52 | 2.57 | 2.65 | 2.82 |
+| persistence | 1.83 | 2.16 | 2.19 | 2.39 | 2.52 | 2.58 |
 
-| t2m RMSE [K] | +6 h | +12 h | +24 h | +48 h |
-|---|---:|---:|---:|---:|
-| fuxi | 0.4 | 0.4 | 0.5 | 0.7 |
-| gencast | – | **0.4** | **0.4** | **0.6** |
-| graphcast | **0.4** | 0.4 | 0.5 | 0.6 |
-| ifs-hres | 0.7 | 0.8 | 0.8 | 0.9 |
-| pangu | 0.4 | 0.5 | 0.5 | 0.7 |
+Skill drops fast after week 2: from week 3 on the ensemble means keep a t2m ACC around 0.4 but their RMSE is barely below climatology, and z500 ACC falls to 0.1–0.3. A single, non-bias-corrected CFSv2 member does worse than persistence for t2m. All numbers (z500, tp, per init): [`results/examples/s2s_2020-10_scores.csv`](results/examples/s2s_2020-10_scores.csv).
 
-Single-model maps, ECMWF IFS HRES z500 / t2m / msl: [`docs/img/2020-10-03_hours_hres_maps.png`](docs/img/2020-10-03_hours_hres_maps.png). CSV: [`results/examples/2020-10-03_hours_scores.csv`](results/examples/2020-10-03_hours_scores.csv).
+<img src="docs/img/s2s_2020-10_scores.png" width="100%">
+<img src="docs/img/s2s_2020-10-01_week3_t2m.png" width="100%">
+<!-- S2S:END -->
 
-### Next week / 未来一周 (`preset="week"`)
+**Weather scale, 2020-10-03 00Z, next 7 days** (`wp.compare(["graphcast","pangu","gefs","ifs-hres"], "z500,t2m", "7d", init="2020-10-03")`, vs ERA5, 1.5°):
 
-Ran: `fuxi` (≤168 h), `gencast` (≤168 h), `graphcast` (≤168 h), `ifs-ens` (≤168 h), `ifs-hres` (≤168 h), `neuralgcm` (≤168 h), `pangu` (≤168 h).
+| mean rank | model | z500 RMSE +72 h [m] | z500 RMSE +168 h [m] | t2m RMSE +168 h [K] |
+|---:|---|---:|---:|---:|
+| 1.3 | GraphCast | 12.9 | 44.0 | **1.54** |
+| 1.8 | Pangu-Weather | **12.7** | **42.7** | 1.59 |
+| 3.2 | IFS HRES | 16.2 | 47.4 | 1.84 |
+| 3.8 | GEFS ens. mean (0.5° → 1.5°) | 19.7 | 43.8 | 2.04 |
 
-![week maps](docs/img/2020-10-03_week_z500_models.png)
-![week scores](docs/img/2020-10-03_week_scores.png)
+More (next 48 h / week / 15 days with 7 models, the latest live cycle, maps): **[docs/EXAMPLES.md](docs/EXAMPLES.md)**.
 
-| z500 RMSE [m] | +24 h | +72 h | +120 h | +168 h |
-|---|---:|---:|---:|---:|
-| fuxi | 4.2 | 14.1 | 27.1 | 40.3 |
-| gencast | 3.9 | 13.4 | 26.6 | 37.5 |
-| graphcast | 4.0 | 12.9 | **24.9** | 44.0 |
-| ifs-ens | 4.8 | 15.0 | 26.5 | **37.0** |
-| ifs-hres | 4.7 | 16.2 | 33.2 | 47.4 |
-| neuralgcm | **3.8** | 12.8 | 25.3 | 40.7 |
-| pangu | 4.5 | **12.7** | 25.5 | 42.7 |
+<img src="docs/img/quickstart_z500_maps.png" width="100%">
 
-| t2m RMSE [K] | +24 h | +72 h | +120 h | +168 h |
-|---|---:|---:|---:|---:|
-| fuxi | 0.5 | 0.8 | 1.1 | 1.4 |
-| gencast | **0.4** | 0.8 | **1.0** | **1.3** |
-| graphcast | 0.5 | **0.8** | 1.0 | 1.5 |
-| ifs-ens | 0.8 | 1.0 | 1.2 | 1.5 |
-| ifs-hres | 0.8 | 1.1 | 1.3 | 1.8 |
-| pangu | 0.5 | 0.9 | 1.2 | 1.6 |
+## 🗂️ Model zoo
 
-CSV: [`results/examples/2020-10-03_week_scores.csv`](results/examples/2020-10-03_week_scores.csv).
+✅ hosted = runs anywhere, no GPU (streamed from open archives) · 🟡 GPU = Earth2Studio / HF ZeroGPU, same call · ⛔ = no open route. `weatherpre models --all` prints this table.
 
-### Next 15 days / 未来 15 天 (`preset="15days"`)
+<!-- MODELS:START (generated by scripts/gen_model_table.py, do not edit) -->
+**Weather scale (≤ 15 days)**
 
-Ran: `fuxi` (≤360 h), `gencast` (≤360 h), `ifs-ens` (≤360 h), `neuralgcm` (≤360 h), `graphcast` (≤240 h), `ifs-hres` (≤240 h), `pangu` (≤240 h).
+| Model | Type | Status | Route | Grid | Lead | Hosted period | Licence |
+|---|---|---|---|---|---|---|---|
+| [`ifs-hres`](https://www.ecmwf.int/en/forecasts) ECMWF IFS HRES | NWP | ✅ hosted | opendata, wb2 | 0.25° / 1.5° | ≤15 d | latest ~4 d (Open Data) · 2016–2022 (WB2) | CC-BY-4.0 |
+| [`aifs-single`](https://arxiv.org/abs/2406.01465) ECMWF AIFS | AI | ✅ hosted | opendata | 0.25° | ≤15 d | latest ~4 d (Open Data) | CC-BY-4.0 |
+| [`aigfs`](https://registry.opendata.aws/noaa-nws-graphcastgfs-pds/) NOAA AIGFS | AI | ✅ hosted | noaa | 0.25° | ≤16 d | 2026-04-16 → now (NOAA S3) | public domain |
+| [`gfs`](https://registry.opendata.aws/noaa-gfs-bdp-pds/) NOAA GFS | NWP | ✅ hosted | noaa | 0.25° | ≤16 d | 2022 → now (NOAA S3) | public domain |
+| [`gefs`](https://registry.opendata.aws/noaa-gefs/) NOAA GEFS ens. mean | NWP | ✅ hosted | gefs | 0.5° | ≤35 d (00Z) | 2020-09-23 → now (NOAA S3, GEFSv12) | public domain |
+| [`graphcast`](https://doi.org/10.1126/science.adi2336) GraphCast | AI | ✅ hosted | wb2, Earth2Studio `GraphCastOperational` | 1.5° (hosted) | ≤10 d | 2019-11 → 2021-01 (WB2) | weights CC-BY-NC-SA-4.0 |
+| [`pangu`](https://doi.org/10.1038/s41586-023-06185-3) Pangu-Weather | AI | ✅ hosted | wb2, Earth2Studio `Pangu6` | 1.5° (hosted) | ≤10 d | 2018–2022 (WB2) | weights CC-BY-NC-SA-4.0 |
+| [`fuxi`](https://doi.org/10.1038/s41612-023-00512-1) FuXi | AI | ✅ hosted | wb2, Earth2Studio `FuXi` | 1.5° (hosted) | ≤15 d | 2020 (WB2) | see upstream |
+| [`gencast`](https://doi.org/10.1038/s41586-024-08252-9) GenCast (ens. mean) | AI | ✅ hosted | wb2 | 1.5° | ≤15 d, 12 h | 2020 (WB2) | weights CC-BY-NC-SA-4.0 |
+| [`neuralgcm`](https://doi.org/10.1038/s41586-024-07744-y) NeuralGCM | AI | ✅ hosted | wb2 | 1.5° | ≤15 d, 12 h | 2020 (WB2) | see upstream |
+| [`ifs-ens`](https://www.ecmwf.int/en/forecasts) ECMWF IFS ENS mean | NWP | ✅ hosted | wb2 | 1.5° | ≤15 d | 2018–2022 (WB2) | WB2 terms |
+| [`cfsv2`](https://registry.opendata.aws/noaa-cfs/) NOAA CFSv2 | NWP | ✅ hosted | cfs | 1° | ≤9 months | 2020 → now (NOAA S3), member 1 | public domain |
+| [`aurora`](https://doi.org/10.1038/s41586-025-09005-y) Aurora | AI | 🟡 GPU | hf, Earth2Studio `Aurora` | 0.25° | any (chunked) | any date (ERA5 / IFS ICs) | MIT |
+| [`aurora-1.5`](https://github.com/microsoft/aurora) Aurora 1.5 | AI | 🟡 GPU | Earth2Studio `Aurora1p5_6h` | 0.25° | 6 h steps | any date | MIT |
+| [`aifs2`](https://arxiv.org/abs/2509.18994) ECMWF AIFS v2 | AI | 🟡 GPU | Earth2Studio `AIFS2` | 0.25° | 6 h steps | latest (IFS ICs) | CC-BY-4.0 |
+| [`aifs2-ens`](https://arxiv.org/abs/2506.10868) ECMWF AIFS-ENS v2 | AI | 🟡 GPU | Earth2Studio `AIFS2ENS` | 0.25° | 6 h steps | latest (IFS ICs) | CC-BY-4.0 |
+| [`fcn3`](https://arxiv.org/abs/2507.12144) FourCastNet 3 | AI | 🟡 GPU | Earth2Studio `FCN3` | 0.25° | 6 h steps | any date | see model card |
+| [`atlas`](https://huggingface.co/nvidia/atlas-era5) NVIDIA Atlas | AI | 🟡 GPU | Earth2Studio `Atlas` | 0.25° | 6 h steps | any date | see model card |
+| [`ucast`](https://arxiv.org/abs/2604.09041) U-CAST | AI | 🟡 GPU | Earth2Studio `UCast` | 1.5° | 12 h steps | any date | see model card |
+| [`weathernext2`](https://github.com/google-deepmind/weathernext) WeatherNext 2 (Cyclones) | AI | 🟡 GPU | Earth2Studio `WeatherNext2Cyclones` | 0.25° | 6 h steps | any date | see model card |
+| [`gencast-mini`](https://github.com/google-deepmind/graphcast) GenCast mini | AI | 🟡 GPU | Earth2Studio `GenCastMini` | 1° | 12 h steps | any date | see model card |
+| [`sfno`](https://arxiv.org/abs/2306.03838) SFNO | AI | 🟡 GPU | Earth2Studio `SFNO` | 0.25° | 6 h steps | any date | see model card |
+| [`fengwu`](https://arxiv.org/abs/2304.02948) FengWu | AI | 🟡 GPU | Earth2Studio `FengWu` | 0.25° | 6 h steps | any date | unclear (keep private) |
+| [`weathernext`](https://developers.google.com/weathernext) Google WeatherNext 2/3 (hosted) | AI | ⛔ | – | 0.25° | ≤15 d | allow-list only | experimental ToS |
 
-![15-day maps](docs/img/2020-10-03_15days_z500_models.png)
-![15-day scores](docs/img/2020-10-03_15days_scores.png)
+**S2S scale (> 15 days, weekly means)**
 
-| z500 RMSE [m] | +24 h | +120 h | +240 h | +360 h |
-|---|---:|---:|---:|---:|
-| fuxi | 4.2 | 27.1 | 62.2 | 83.7 |
-| gencast | 3.9 | 26.6 | 59.8 | 84.4 |
-| graphcast | 4.0 | **24.9** | 71.1 | – |
-| ifs-ens | 4.8 | 26.5 | **57.1** | **79.3** |
-| ifs-hres | 4.7 | 33.2 | 77.2 | – |
-| neuralgcm | **3.8** | 25.3 | 71.2 | 119.2 |
-| pangu | 4.5 | 25.5 | 74.4 | – |
+| Model | Type | Status | Route | Grid | Lead | Hosted period | Licence |
+|---|---|---|---|---|---|---|---|
+| [`gefs`](https://registry.opendata.aws/noaa-gefs/) NOAA GEFS ens. mean | NWP | ✅ hosted | gefs | 0.5° | ≤35 d (00Z) | 2020-09-23 → now (NOAA S3, GEFSv12) | public domain |
+| [`ifs-ext`](https://www.ecmwf.int/en/forecasts/documentation-and-support/extended-range) ECMWF extended range (ens. mean) | NWP | ✅ hosted | wb2-ext | 1.5° | 46 d, weekly means | 2016–2022, Mon/Thu inits (WB2) | WB2 terms |
+| [`cfsv2`](https://registry.opendata.aws/noaa-cfs/) NOAA CFSv2 | NWP | ✅ hosted | cfs | 1° | ≤9 months | 2020 → now (NOAA S3), member 1 | public domain |
+| [`climatology`](https://weatherbench2.readthedocs.io) ERA5 climatology | baseline | ✅ hosted | baseline | 1.5° | any | any date (1990–2017 clim.) | Copernicus |
+| [`persistence`](https://weatherbench2.readthedocs.io) ERA5 anomaly persistence | baseline | ✅ hosted | baseline | 1.5° | any | 1959 – 2023-01 (ERA5 in WB2) | Copernicus |
+| [`ucast`](https://arxiv.org/abs/2604.09041) U-CAST | AI | 🟡 GPU | Earth2Studio `UCast` | 1.5° | 12 h steps | any date | see model card |
+| [`fuxi-s2s`](https://doi.org/10.1038/s41467-024-50714-1) FuXi-S2S | AI | 🟡 GPU | Earth2Studio `FuXiS2S` | 1.5° | 42 d, daily | any date | CC-BY-NC-ND |
+| [`dlesym`](https://arxiv.org/abs/2409.16247) DLESyM (atmos.+ocean) | AI | 🟡 GPU | Earth2Studio `DLESyMLatLon` | ~1° HEALPix | 6 h → seasonal | any date | see model card |
+| [`ace2`](https://arxiv.org/abs/2411.11268) ACE2-ERA5 | AI | 🟡 GPU | Earth2Studio `ACE2ERA5` | 1° | 6 h → climate | any date (forcings) | Apache-2.0 |
+<!-- MODELS:END -->
 
-| t2m RMSE [K] | +24 h | +120 h | +240 h | +360 h |
-|---|---:|---:|---:|---:|
-| fuxi | 0.5 | 1.1 | 2.0 | 2.5 |
-| gencast | **0.4** | **1.0** | 1.8 | 2.4 |
-| graphcast | 0.5 | 1.0 | 2.2 | – |
-| ifs-ens | 0.8 | 1.2 | **1.8** | **2.3** |
-| ifs-hres | 0.8 | 1.3 | 2.5 | – |
-| pangu | 0.5 | 1.2 | 2.3 | – |
+## 🧭 How it works
 
-CSV: [`results/examples/2020-10-03_15days_scores.csv`](results/examples/2020-10-03_15days_scores.csv).
+```
+wp.forecast(model, variable, lead, init)
+   │  catalog.py: scales, routes, periods, licences          leads.py: "7d" -> weather leads | "6w" -> S2S weeks
+   ▼
+ resolve()  ── hosted first ──►  WeatherBench 2 (GCS zarr) · ECMWF Open Data · NOAA S3 (GFS, AIGFS, GEFS, CFSv2)
+            ── then GPU ──────►  Earth2Studio (any px model) · HF ZeroGPU Space (Aurora)
+   ▼
+ one schema: (lead | week, latitude, longitude), z500 / t850 / t2m / msl / tp
+   ▼
+ wp.compare(): regrid to the WB2 1.5° grid (or 0.25°) ─► WeatherBench-X RMSE / ACC ─► table · ranking · figures
+```
 
-### Latest cycle (live) / 最新一轮
+Truth: ERA5 6-hourly (weather, 2018–2021), ERA5 weekly means + 1990–2017 weekly climatology (S2S, to 2023-01), IFS analysis as a proxy for recent weather cycles. Future valid times cannot be scored; for those, `compare` reports the inter-model spread.
 
-`wp.forecast("aifs", init="latest", lead_days=15)`: AIFS-single, init 2026-10-03 06Z, ECMWF Open Data, 0.25°, 15 leads (+24 … +360 h).
+## ⚠️ Honest limits
 
-![AIFS latest](docs/img/aifs_latest_maps.png)
+* Hosted archives differ: WeatherBench 2 forecasts are 1.5° and mostly 2018–2022; ECMWF Open Data keeps only ~4 days; GEFSv12 starts 2020-09-23 and reaches 35 days (00Z); CFSv2 (member 1) is not bias-corrected, so its S2S anomalies carry model climate drift (e.g. over high terrain).
+* Scores of models with other native grids are computed after box-smoothing to the WB2 1.5° grid; this is fair between models but not identical to WB2's conservative regridding.
+* GPU routes are tested end-to-end with Earth2Studio's `Persistence` model on CPU; the large models need a CUDA GPU and their Earth2Studio extra, and several weights are non-commercial.
+* Aurora in 2020 uses ERA5 initial conditions inside its training period (a pipeline check, not out-of-sample skill).
 
-Four-model view (`aifs-single`, `ifs-hres`, `aigfs`, `gfs`, all on the 2026-10-03 00Z cycle, +120 h; [t2m](docs/img/latest_week_t2m_models.png)):
+## 🛣️ Roadmap
 
-![latest z500](docs/img/latest_week_z500_models.png)
+- [ ] Probabilistic scores (CRPS, spread–skill) for ensembles (GEFS members, AIFS-ENS, GenCast, FCN3)
+- [ ] Bias-corrected S2S anomalies from reforecasts (ECMWF / CFSv2 hindcasts)
+- [ ] Point / city time series (`wp.forecast(..., at=(35.7, 139.7))`) and regional crops
+- [ ] Published GPU runs (Earth2Studio) for a shared leaderboard
+- [ ] Hosted docs site
 
-No verification exists yet for these valid times, so only the **inter-model spread** (RMSE of each model against the 4-model mean, a consensus not a skill score) is given: [`results/examples/latest_week_consensus.csv`](results/examples/latest_week_consensus.csv). Leads whose valid time already has an IFS analysis are scored against it as a proxy truth.
+Ideas and new models are welcome: [open an issue](https://github.com/GISWLH/WeatherPre/issues/new/choose) or see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Models / 模型
+## 📚 Cite & licence
 
-Status: ✅ ran in this repo (outputs in `results/`) · ⚠️ route exists, **not run** · ❌ blocked. Resolution of hosted WeatherBench 2 (WB2) data here is 1.5°.
+Code: Apache-2.0 ([CITATION.cff](CITATION.cff)). Data and weights keep their own terms: ECMWF Open Data CC-BY-4.0 (credit ECMWF), NOAA public domain, ERA5 / WeatherBench 2 per Copernicus and WB2 terms; non-commercial weights are never committed. Please also cite the models and [WeatherBench 2](https://doi.org/10.1029/2023MS004019) you use.
 
-| Model | Type | Route | Lead · grid | Licence note | Status |
-|---|---|---|---|---|---|
-| **IFS HRES** | NWP, medium-range | hosted: ECMWF Open Data (latest ~4 d only) · WB2 (2016–22) | ≤360 h (00/12Z) · 0.25° / 1.5° | CC-BY-4.0 | ✅ |
-| **AIFS-single** | AI, medium-range | hosted: ECMWF Open Data (latest ~4 d only; no archive) | ≤360 h (00/12Z) · 0.25° | CC-BY-4.0 | ✅ latest · ❌ 2020 |
-| AIFS-ENS | AI, ensemble | hosted: Open Data (dir exists) | not checked | CC-BY-4.0 | ⚠️ |
-| **AIGFS** (NOAA) | AI, medium-range | hosted: NOAA S3 (daily dirs since 2026-04-16) | ≤384 h · 0.25° | public domain | ✅ |
-| **GFS** (NOAA) | NWP baseline | hosted: NOAA S3 (0.25° present 2022-01, absent 2021-03) | ≤384 h · 0.25° | public domain | ✅ |
-| **GraphCast** *Science* 2023 | AI, medium-range | hosted: WB2 (2019-11…2021-01) | ≤240 h · 1.5° | upstream weights NC (re-check) | ✅ |
-| **Pangu-Weather** *Nature* 2023 | AI, medium-range | hosted: WB2 (2018–22) | ≤240 h · 1.5° | upstream NC (re-check) | ✅ |
-| **FuXi** *npj CAS* 2023 | AI, medium-range | hosted: WB2 (2020) | ≤360 h · 1.5° | upstream NC (re-check) | ✅ |
-| **GenCast** *Nature* 2025 | AI, ensemble (mean in WB2) | hosted: WB2 (2020) | ≤360 h, 12 h steps · 1.5° | upstream NC (re-check) | ✅ mean |
-| **NeuralGCM** *Nature* 2024 | hybrid, det./ens. | hosted: WB2 (2020) | ≤360 h, 12 h steps · 1.5° | re-check | ✅ det. |
-| **IFS-ENS** | NWP ensemble (mean) | hosted: WB2 (2018–22) | ≤360 h · 1.5° | WB2 terms | ✅ mean |
-| **Aurora** *Nature* 2025 | AI foundation, 0.25° | upstream `microsoft-aurora` on **HF ZeroGPU** (ERA5 or IFS-analysis initial conditions); [Colab](notebooks/colab_aurora.ipynb) | any steps (chunked) · 0.25° | MIT weights | ✅ HF · ⚠️ Colab |
-| FourCastNet3 / SFNO, Pangu, FuXi, FengWu, GraphCast-op., AIFS(2) | AI, medium-range | Earth2Studio ([wrapper](weatherpre/adapters/earth2studio_run.py), [Colab](notebooks/colab_earth2studio.ipynb)) | model-specific | per model | ⚠️ not run (needs Py ≥ 3.11 GPU) |
-| GenCast-mini, WN-Cyclones-mini, ACE2-ERA5, DLESyM, SamudrACE | AI, ensemble / climate | Earth2Studio, or our [WeatherAI](https://github.com/GISWLH/WeatherAI) ports | 1° | Apache-2.0 / per model | ⚠️ not run |
-| StormCast, CorrDiff | AI, km-scale (CONUS / downscaling) | Earth2Studio · WeatherAI port | 3 km | Apache-2.0 | ⚠️ not run |
-| FuXi-S2S *Nat. Commun.* 2024 | S2S | Earth2Studio · WeatherAI port | daily, 42 d | **CC-BY-NC-ND** | ⚠️ not run |
-| ORCA-DL, UniCM | ocean / SST | WeatherAI port only | monthly | no licence / no public ckpt | ⚠️ not run |
-| TropiCycloneNet | tropical cyclone | WeatherAI port only | 24 h track | CC-BY-4.0 ckpt | ⚠️ not run |
-| WeatherNext 2 / 3 | AI, ensemble 0.25° | Google GCS/BigQuery/EE, allow-list | ≤15 d | experimental ToS | ❌ needs Google allow-list |
-
-## Limits / 局限
-
-* **15-day coverage differs per model**: GraphCast, Pangu, IFS HRES stop at 240 h in WeatherBench 2; FuXi, IFS-ENS (ensemble mean), GenCast (ensemble mean, 12 h steps) and NeuralGCM (12 h steps) reach 360 h; NeuralGCM has no t2m. Missing leads are skipped with a warning.
-* ECMWF Open Data keeps ~4 days: **no archive**. AIFS / IFS for a 2020 date can only come from WB 2 (IFS HRES) or from running the model yourself (Earth2Studio, not run here).
-* WB 2 inits are 00/12Z; hosted data is 1.5° (Aurora / Open Data / NOAA: 0.25°). Scores of different grids are compared against the matching ERA5 grid and are not strictly like-for-like.
-* Everything is scored against ERA5, including IFS HRES (its own analysis would score it better). `–` = lead not provided (12 h-step models have no +6 h).
-* Future valid times cannot be scored; latest-cycle tables show model spread only.
-* Aurora 2020 uses ERA5 initial conditions and the ERA5-pretrained checkpoint, inside its training period: a pipeline check, not out-of-sample skill. **The 2020-10-03 15-day Aurora run is not in the examples**: on HF it completed 7 of 8 chunks (to +336 h) and then hit the Pro ZeroGPU quota (resets after ~23 h) before the result could be collected, so no Aurora panel is shown; a re-run needs a fresh quota (`python scripts/run_aurora.py days15`, then `make_examples.py week days15` picks it up). Earlier, Aurora ran for 2020-10-01 (see `results/aurora_2020-10-01`).
-* Colab notebooks and the Earth2Studio wrapper are provided but **not executed**.
-
-## Licences / 许可
-
-Code Apache-2.0. ECMWF Open Data CC-BY-4.0 (credit ECMWF); NOAA public domain; ERA5 per Copernicus terms. NC / ND weights are never committed. Regenerate every image: `python scripts/make_examples.py aifs_latest hours week days15 latest_models` (downloads are cached in `data/cache`, so re-styling needs no re-download; if `data.ecmwf.int` is unreachable set `WEATHERPRE_ECMWF_SOURCE=google` or `aws` for the official cloud mirrors).
-
-Maps: Robinson globe cut at 60°S with [`GISWLH/cartopy-robinson-lat-clip`](https://github.com/GISWLH/cartopy-robinson-lat-clip) (`clip_robinson_south_of`), which keeps the oval's curved sides instead of the rectangular side cuts `set_extent(lat_min=-60)` gives. z500 in dam with 8 dam isolines and the 588 dam line (subtropical high edge) in bold; every model keeps one colour across maps and score charts, AI solid and NWP dashed.
+Built on [WeatherBench 2 / WeatherBench-X](https://github.com/google-research/weatherbenchX), [Earth2Studio](https://github.com/NVIDIA/earth2studio), [ecmwf-opendata](https://github.com/ecmwf/ecmwf-opendata), [microsoft-aurora](https://github.com/microsoft/aurora), NOAA Open Data Dissemination and [cartopy-robinson-lat-clip](https://github.com/GISWLH/cartopy-robinson-lat-clip). Related: [GISWLH/WeatherAI](https://github.com/GISWLH/WeatherAI) (model ports).
