@@ -3,10 +3,12 @@ from weatherpre import catalog as C
 
 def test_every_model_is_consistent():
     for m in C.MODELS.values():
-        assert set(m.scales) <= {C.WEATHER, C.S2S}, m.name
+        assert set(m.scales) <= {C.WEATHER, C.S2S, C.SEASONAL}, m.name
         assert m.kind in ("AI", "NWP", "baseline"), m.name
         if "e2s" in m.routes: assert m.e2s, m.name
-        assert m.status in ("hosted", "gpu", "blocked")
+        assert m.status in ("hosted", "gpu", "run", "blocked")
+        assert m.validated_max_days is None or m.technical_max_days is None or m.validated_max_days <= m.technical_max_days
+        assert m.state("report_eligible") in ("yes", "no"), m.name
 
 def test_both_scales_have_hosted_models():
     assert len(C.for_scale(C.WEATHER, hosted_only=True)) >= 8
@@ -19,7 +21,7 @@ def test_aliases():
 
 E2S_CLASSES = {"ACE2ERA5", "AIFS", "AIFS2", "AIFS2ENS", "AIFSENS", "Atlas", "Aurora", "Aurora1p5_6h", "DLESyMLatLon", "FCN3",
                "FengWu", "FuXi", "FuXiS2S", "GenCastMini", "GraphCastOperational", "Pangu6", "SFNO", "UCast",
-               "WeatherNext2Cyclones"}   # earth2studio 0.19 `earth2studio.models.px` exports
+               "WeatherNext2Cyclones", "SamudrACE"}   # earth2studio 0.19 `earth2studio.models.px` exports
 
 def test_e2s_class_names():
     used = {m.e2s for m in C.MODELS.values() if m.e2s}

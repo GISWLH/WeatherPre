@@ -17,8 +17,18 @@ OUT = {"z500": (("z500",), 1 / G, "m", "500 hPa geopotential height"),
        "t850": (("t850",), 1.0, "K", "850 hPa temperature"),
        "t2m": (("t2m",), 1.0, "K", "2 m temperature"),
        "msl": (("msl",), 0.01, "hPa", "mean sea-level pressure"),
-       "tp": (("tp", "tp06", "tp12", "tp24"), 1000.0, "mm", "precipitation accumulated since init")}
+       "tp": (("tp", "tp06", "tp12", "tp24"), 1000.0, "mm", "precipitation accumulated since init"),
+       "sst": (("sst",), 1.0, "degC", "sea surface temperature")}           # K in Earth2Studio -> degC (offset applied below)
+# Coupled models predict some variables on a coarser time step inside a dense output grid (DLESyM: ocean every 48 h,
+# see DLESyM.retrieve_valid_ocean_outputs: lead_time % ocean_output_times[0] == 0). Other leads are not predictions.
+VALID_EVERY_H = {("DLESyM", "sst"): 48, ("DLESyMLatLon", "sst"): 48}
 ECMWF_IC = {"AIFS", "AIFS2", "AIFSENS", "AIFS2ENS"}          # upstream recommends IFS initial conditions for these
+# Precipitation semantics. Earth2Studio ids tp06 / tp12 / tp24 are accumulations [m] over 6 / 12 / 24 h; plain "tp" means
+# different things per model (FuXiS2S: daily mean of HOURLY accumulations [m/h], see its docstring), so it is only used where
+# the meaning was checked. Anything else: tp is dropped with a warning instead of guessing a factor.
+PRECIP_WINDOW_H = {"tp06": 6, "tp12": 12, "tp24": 24}
+PRECIP_TP = {"FuXiS2S": ("mean_hourly_accumulation_m", 24)}       # class -> (meaning of "tp", hours per output step)
+DAILY_MEAN_MODELS = {"FuXiS2S"}                                    # outputs are daily means labelled at the start of the day
 
 def available() -> bool:
     try:
@@ -78,8 +88,18 @@ def forecast(cls_name: str, init, lead_hours, variables=("z500", "t850", "t2m", 
     out = {}
     for v, e in pick.items():
         _, k, units, ln = OUT[v]
-        da = raw[e] * k
-        if v == "tp": da = da.fillna(0).cumsum("lead")               # per-step accumulation -> since init
+        if v == "tp":
+            mm_step = precip_mm_per_step(cls_name, e, step_h, raw[e])
+            if mm_step is None: continue
+            mm_step = mm_step.where(mm_step.lead > 0, 0.0)              # lead 0 is the initial condition: nothing accumulated yet
+            out[v] = mm_step.cumsum("lead").astype("float32").assign_attrs(units=units, long_name=ln,
+                                                                             definition=f"Earth2Studio {e}, accumulated since init")
+            continue
+        da = raw[e] * k - (273.15 if v == "sst" else 0.0)
+        every = VALID_EVERY_H.get((cls_name, e))
+        if every:
+            da = da.where(da.lead % every == 0)                       # non-predicted entries of the dense grid -> NaN
+            ln = ln + f" (valid every {every} h only)"
         out[v] = da.astype("float32").assign_attrs(units=units, long_name=ln)
     u = xr.Dataset(out).drop_vars("time", errors="ignore")
     keep = [h for h in lead_hours if h in u.lead.values]
@@ -90,6 +110,21 @@ def forecast(cls_name: str, init, lead_hours, variables=("z500", "t850", "t2m", 
     u.attrs.update(model=model_name or f"e2s:{cls_name}", backend="e2s", init=f"{init:%Y-%m-%dT%HZ}",
                    source=f"Earth2Studio {cls_name}, ICs {type(_ic_source(cls_name, init, source)).__name__}")
     return u.sortby("latitude").transpose("lead", "latitude", "longitude")
+
+def precip_mm_per_step(cls_name: str, var: str, step_h: int, da):
+    """mm of precipitation per model output step, or None (with a warning) when the meaning is not established.
+    NaN is kept (no zero filling): a missing step makes the accumulation since init missing from then on."""
+    import warnings
+    if var in PRECIP_WINDOW_H:
+        if PRECIP_WINDOW_H[var] != step_h:
+            warnings.warn(f"{cls_name}: {var} covers {PRECIP_WINDOW_H[var]} h but the model step is {step_h} h - tp dropped"); return None
+        return da * 1000.0
+    if var == "tp" and cls_name in PRECIP_TP:
+        meaning, hours = PRECIP_TP[cls_name]
+        if meaning == "mean_hourly_accumulation_m" and hours == step_h:
+            return da * 1000.0 * hours
+    warnings.warn(f"{cls_name}: precipitation variable {var!r} has no verified meaning in WeatherPre - tp dropped")
+    return None
 
 def run_e2s(model: str, init: str, nsteps: int, source: str, out: str):
     """Kept for the Colab notebook: run `model` for nsteps*6 h and write netCDF."""

@@ -6,12 +6,13 @@ from weatherpre import leads as L
     ("hours", "weather", 6, 48, 8), ("week", "weather", 12, 168, 14), ("15days", "weather", 24, 360, 15),
     ("24,48,72", "weather", 24, 72, 3), ("6-48/6", "weather", 6, 48, 8), (36, "weather", 36, 36, 1),
     ("6w", "s2s", 1, 6, 6), ("45d", "s2s", 1, 6, 6), ("week3-4", "s2s", 3, 4, 2), ("w3", "s2s", 3, 3, 1),
-    ("s2s", "s2s", 1, 6, 6), ("2m", "s2s", 1, 8, 8), ("5W", "s2s", 1, 5, 5), ("W5", "s2s", 5, 5, 1),
+    ("s2s", "s2s", 1, 6, 6), ("5W", "s2s", 1, 5, 5), ("W5", "s2s", 5, 5, 1),
+    ("2m", "seasonal", 1, 2, 2), ("6mo", "seasonal", 1, 6, 6), ("m2-4", "seasonal", 2, 4, 3),   # calendar months (was 2m -> 8 weeks)
 ])
 def test_parse(spec, scale, first, last, n):
     lv = L.parse(spec)
     assert lv.scale == scale
-    xs = lv.hours if scale == "weather" else lv.weeks
+    xs = lv.hours if scale == "weather" else lv.weeks if scale == "s2s" else lv.months
     assert (xs[0], xs[-1], len(xs)) == (first, last, n)
 
 def test_boundary_is_15_days():

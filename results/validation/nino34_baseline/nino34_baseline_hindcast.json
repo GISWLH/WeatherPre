@@ -1,0 +1,111 @@
+{
+ "observation": "ERA5 SST (WB2 6-hourly 1.5 deg), monthly means from 24 samples/month",
+ "split": "Split(train=None, calibration=('1991-01', '2010-12'), test=('2011-01', '2022-12'))",
+ "anomaly_checks_vs_1991_2010": {
+  "2015-12-01": 2.65,
+  "2010-12-01": -1.71,
+  "1997-12-01": 2.81,
+  "2020-12-01": -1.19
+ },
+ "persistence": [
+  {
+   "lead": 1,
+   "n_inits": 143,
+   "members": 1,
+   "rmse": 0.24886191693573773,
+   "acc": 0.9538365225109893,
+   "msss_vs_climatology": 0.9064105586090767
+  },
+  {
+   "lead": 2,
+   "n_inits": 142,
+   "members": 1,
+   "rmse": 0.409793285735279,
+   "acc": 0.873958285764836,
+   "msss_vs_climatology": 0.7441241763422441
+  },
+  {
+   "lead": 3,
+   "n_inits": 141,
+   "members": 1,
+   "rmse": 0.547041936062932,
+   "acc": 0.7749576990743544,
+   "msss_vs_climatology": 0.5423885762612082
+  },
+  {
+   "lead": 4,
+   "n_inits": 140,
+   "members": 1,
+   "rmse": 0.6738456577711237,
+   "acc": 0.6583830314568027,
+   "msss_vs_climatology": 0.30681700379891386
+  },
+  {
+   "lead": 5,
+   "n_inits": 139,
+   "members": 1,
+   "rmse": 0.7784058671859508,
+   "acc": 0.5451878259660782,
+   "msss_vs_climatology": 0.07934595084261675
+  },
+  {
+   "lead": 6,
+   "n_inits": 138,
+   "members": 1,
+   "rmse": 0.8697637659916593,
+   "acc": 0.43480207706533536,
+   "msss_vs_climatology": -0.14233824971694609
+  }
+ ],
+ "climatology": [
+  {
+   "lead": 1,
+   "n_inits": 143,
+   "members": 1,
+   "rmse": 0.8134765058766631,
+   "acc": NaN,
+   "msss_vs_persistence": -9.684966008323503
+  },
+  {
+   "lead": 2,
+   "n_inits": 142,
+   "members": 1,
+   "rmse": 0.810121599657691,
+   "acc": NaN,
+   "msss_vs_persistence": -2.908145700148443
+  },
+  {
+   "lead": 3,
+   "n_inits": 141,
+   "members": 1,
+   "rmse": 0.8086716008361032,
+   "acc": NaN,
+   "msss_vs_persistence": -1.1852601314664906
+  },
+  {
+   "lead": 4,
+   "n_inits": 140,
+   "members": 1,
+   "rmse": 0.8093502098957295,
+   "acc": NaN,
+   "msss_vs_persistence": -0.44262049917610646
+  },
+  {
+   "lead": 5,
+   "n_inits": 139,
+   "members": 1,
+   "rmse": 0.8112558974713414,
+   "acc": NaN,
+   "msss_vs_persistence": -0.08618432832097689
+  },
+  {
+   "lead": 6,
+   "n_inits": 138,
+   "members": 1,
+   "rmse": 0.8137742654911756,
+   "acc": NaN,
+   "msss_vs_persistence": 0.12460254198107723
+  }
+ ],
+ "note": "baseline skill only: the bar an AI SST model must clear on the same split; not a model result"
+}

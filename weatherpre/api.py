@@ -8,28 +8,30 @@ existing solution (WeatherBench 2 zarr, ECMWF Open Data, NOAA S3, upstream `micr
 NVIDIA Earth2Studio).
 
 Weather result: dims (lead [h], latitude, longitude); z500 [m], t850 [K], t2m [K], msl [hPa], tp [mm since init].
-S2S result:     dims (week, latitude, longitude); same names, weekly means, tp [mm/day]. See weatherpre.s2s."""
+S2S result:     dims (week, latitude, longitude); same names, weekly means, tp [mm/day]. See weatherpre.s2s.
+Model runs (backend "weatherai": ORCA-DL, FuXi-S2S, ACE2): common schema (weatherpre.schema) with dims (member, period, ...),
+period = week / calendar month / target window, valid_start / valid_end / completeness per period, masks valid_<var>.
+Ocean variables: sst [degC], tos [degC] (ORCA-DL near-surface proxy, never renamed to sst), thetao, so, zos, uo, vo."""
 from __future__ import annotations
 import datetime as dt, os, re, warnings
 from pathlib import Path
 import numpy as np, xarray as xr
-from . import registry as R, grib, catalog as C, leads as L
+from . import registry as R, grib, catalog as C, leads as L, variables as V
 from .common import parse_time, gcs_open
 
 DATA = Path(os.environ.get("WEATHERPRE_DATA", "data"))
 PRESETS = L.PRESETS
 ALIASES = C.ALIASES
-VARIABLES = ("z500", "t850", "t2m", "msl", "tp")
-VAR_ALIASES = {"z": "z500", "gh": "z500", "gh500": "z500", "geopotential": "z500", "hgt500": "z500",
-               "t": "t850", "temperature850": "t850", "t2": "t2m", "2t": "t2m", "temperature": "t2m", "tas": "t2m",
-               "mslp": "msl", "slp": "msl", "pressure": "msl", "precip": "tp", "precipitation": "tp", "rain": "tp", "pr": "tp"}
+VARIABLES = V.ATMOS                               # default set (atmosphere); ocean variables are requested by name
+VAR_ALIASES = V.ALIASES
 # best candidates per horizon (first = default). Hosted history = WeatherBench 2; latest = Open Data / NOAA.
 BEST_HIST = {"hours": ["ifs-hres", "graphcast", "pangu", "fuxi", "gencast", "neuralgcm"],
              "week": ["ifs-hres", "graphcast", "pangu", "fuxi", "gencast", "neuralgcm", "ifs-ens"],
              "15days": ["fuxi", "gencast", "neuralgcm", "ifs-ens", "ifs-hres", "graphcast", "pangu"],
-             "s2s": ["ifs-ext", "gefs", "cfsv2", "persistence", "climatology"]}
+             }
 BEST_LATEST = {"hours": ["aifs-single", "ifs-hres", "aigfs", "gfs", "gefs"], "week": ["aifs-single", "ifs-hres", "aigfs", "gfs", "gefs"],
-               "15days": ["aifs-single", "ifs-hres", "aigfs", "gfs", "gefs"], "s2s": ["gefs", "cfsv2", "climatology"]}
+               "15days": ["aifs-single", "ifs-hres", "aigfs", "gfs", "gefs"]}
+# S2S candidates are derived from the catalog (availability.candidates); no second hand-kept list
 RETENTION_H = 90      # ECMWF Open Data keeps ~4 days; be conservative
 NOAA_ARCHIVE = {"aigfs": dt.datetime(2026, 4, 16), "gfs": dt.datetime(2022, 1, 1), "gefs": dt.datetime(2020, 9, 23),
                 "cfsv2": dt.datetime(2020, 1, 1)}   # earliest dates actually seen
@@ -54,16 +56,8 @@ def _recent(t):
     return t == "latest" or (dt.datetime.utcnow() - t) < dt.timedelta(hours=RETENTION_H)
 
 def variables(v=None) -> list[str]:
-    """None/'all' -> every variable; 'T2M', ['t2m','precip'] -> canonical names."""
-    if v is None or (isinstance(v, str) and v.lower() == "all"): return list(VARIABLES)
-    vs = [v] if isinstance(v, str) else list(v)
-    out = []
-    for x in vs:
-        for y in str(x).split(","):
-            k = y.strip().lower(); k = VAR_ALIASES.get(k, k)
-            if k not in VARIABLES: raise ValueError(f"unknown variable {y!r}; choose from {', '.join(VARIABLES)}")
-            out.append(k)
-    return list(dict.fromkeys(out))
+    """None/'all' -> the atmosphere set; 'T2M', ['t2m','precip'], 'sst', 'tos' -> canonical names (weatherpre.variables)."""
+    return V.parse(v)
 
 def _looks_like_init(x) -> bool:
     return isinstance(x, (dt.datetime, dt.date, np.datetime64)) or (
@@ -79,7 +73,8 @@ def _gpu_route(m: str, t, scale) -> tuple[str, str, object]:
 
 def resolve(model: str, init, leads=None) -> tuple[str, str, object]:
     """-> (backend, canonical_model, init_datetime|'latest').
-    backend in wb2 | opendata | noaa | gefs | cfs | wb2-ext | baseline | hf | e2s."""
+    backend in wb2 | opendata | noaa | gefs | cfs | wb2-ext | baseline | hf | e2s | weatherai.
+    Requests longer than the model's technical horizon are refused here, whatever the backend."""
     m, t = _canon(model), _init(init)
     lv = leads if isinstance(leads, L.Leads) else L.parse(lead_hours=leads) if leads is not None else L.parse("7d")
     scale = lv.scale
@@ -87,11 +82,26 @@ def resolve(model: str, init, leads=None) -> tuple[str, str, object]:
     if m not in C.MODELS: raise BackendUnavailable(f"unknown model {model!r}; see weatherpre.models()")
     spec = C.MODELS[m]
     if scale not in spec.scales:
-        alt = ", ".join(x.name for x in C.for_scale(scale, hosted_only=True))
-        what = "weather (<= 15 days)" if scale == C.S2S else "S2S (> 15 days)"
+        alt = ", ".join(x.name for x in C.for_scale(scale, hosted_only=True)) or ", ".join(x.name for x in C.for_scale(scale))
+        names = {"weather": "weather (<= 15 days)", "subseasonal": "S2S / subseasonal (> 15 days)", "seasonal": "seasonal "
+                 "(calendar months)", "scenario": "scenario (prescribed boundary conditions)"}
+        what = " + ".join(names[p] for p in spec.products)
         raise BackendUnavailable(f"{m} is a {what} model; for {scale} leads use one of: {alt}")
-    if not spec.routes:
-        raise BackendUnavailable(f"{m}: no open route ({spec.period}); see {spec.ref}")
+    if spec.blocked or not spec.routes:
+        raise BackendUnavailable(f"{m}: [blocked] {spec.blocked or 'no open route'} ({spec.period}); see {spec.ref}")
+    if spec.research_only:
+        raise BackendUnavailable(f"{m}: [research_only] {spec.research_only}")
+    if t != "latest" and spec.technical_max_days is not None and not spec.hosted:   # hosted products: partial coverage, reported
+        try:
+            need = lv.horizon_days(t, spec.ic_offset_days)
+        except ValueError:
+            need = None
+        if need is not None and need > spec.technical_max_days + 1e-9:
+            raise BackendUnavailable(f"{m}: [beyond_technical_horizon] request needs {need:g} days from {t:%Y-%m-%d}; {m} runs at most "
+                                     f"{spec.technical_max_days:g} days ({spec.technical_note or spec.lead})")
+    if "weatherai" in spec.routes and (spec.name not in R.WB2_HOSTED or scale != C.WEATHER or t == "latest"):
+        if t == "latest": raise BackendUnavailable(f"{m}: give an explicit init date for a model run")
+        return "weatherai", m, t
     recent = _recent(t)
     if scale == C.S2S:
         if m == "ifs-ext":
@@ -224,33 +234,79 @@ def _hf(t, leads):
     return hf_space.aurora(t, leads)
 
 def forecast(model: str, variable=None, lead=None, init="latest", *, backend="auto", cache=None, verbose=True,
-             lead_hours=None, lead_days=None, preset=None, **kw) -> xr.Dataset:
-    """Forecast `variable` (None = all) from `model` for horizon `lead` ('48h', '7d', '15d', '6w', 'week3-4', ...)
-    starting at `init` ('YYYY-MM-DD[THH]' or 'latest'). <= 15 days -> weather schema, > 15 days -> weekly S2S schema."""
+             lead_hours=None, lead_days=None, preset=None, target_start=None, target_end=None, aggregation="month",
+             source=None, checkpoint=None, members=None, seed=0, device=None, model_backend=None, forcing=None,
+             forcing_provenance=None, out_dir=None, resume=True, require_complete=True, **kw) -> xr.Dataset:
+    """Forecast `variable` (None = atmosphere set) from `model` for horizon `lead` ('48h', '7d', '15d', '6w', 'week3-4', '6m', ...)
+    or an explicit window (`target_start`, `target_end` inclusive date, `aggregation` month | week | period), starting at `init`.
+
+    Run settings passed through to the backend: `source` (initial conditions: Earth2Studio data-source class name for e2s;
+    'godas' | 'orca-example' | 'dir:<path>' for ORCA-DL; 'wb2-era5' | 'file:<input.nc>' | 'official-sample:<dir>' for FuXi-S2S),
+    `checkpoint` (local weights root), `members` (count or ids; ORCA-DL ids are seeds), `seed`, `device`,
+    `model_backend` (FuXi-S2S: 'onnx' official (default) | 'torch'), `forcing` + `forcing_provenance` (ACE2), `out_dir`
+    (chunked, resumable files + manifests). Periods that the model output does not fully cover are dropped and listed in
+    attrs['incomplete_periods'] (`require_complete=False` keeps them with their `completeness`)."""
     if variable is not None and _looks_like_init(variable):          # legacy: forecast(model, init, lead_hours=...)
         init, variable = variable, None
     if "init_time" in kw: init = kw.pop("init_time")
     if kw: raise TypeError(f"unexpected arguments {list(kw)}")
     cache = Path(cache or DATA)
-    lv = L.parse(lead, lead_hours=lead_hours, lead_days=lead_days, preset=preset)
+    lv = L.parse(lead, lead_hours=lead_hours, lead_days=lead_days, preset=preset, target_start=target_start, target_end=target_end,
+                 aggregation=aggregation)
     vs = variables(variable)
     be, m, t = resolve(model, init, lv) if backend == "auto" else (backend, _canon(model), _init(init))
-    if lv.scale == C.S2S:
-        u = _forecast_s2s(be, m, t, lv, vs, cache)
+    for v in vs:
+        if m in C.MODELS and v not in C.MODELS[m].variables:
+            prox = [x for x in C.MODELS[m].variables if V.VARS[x].proxy_for == v]
+            if prox and len(vs) == 1:
+                raise BackendUnavailable(f"{m}: [proxy_variable] no '{v}'; '{prox[0]}' is a proxy ({V.VARS[prox[0]].long_name}) and is "
+                                         f"returned only when requested by name")
+    if members not in (None, 1) and be != "weatherai":
+        raise BackendUnavailable(f"{m}: members are only wired for model runs (backend weatherai); {be} returns its hosted product")
+    if be == "weatherai":
+        u = _forecast_run(m, t, lv, vs, source=source, checkpoint=checkpoint, members=members, seed=seed, device=device,
+                          model_backend=model_backend, forcing=forcing, forcing_provenance=forcing_provenance, out_dir=out_dir,
+                          resume=resume, require_complete=require_complete)
+    elif lv.scale == C.S2S and not lv.target:
+        u = _forecast_s2s(be, m, t, lv, vs, cache, source=source)
+    elif lv.scale == C.WEATHER:
+        u = _forecast_weather(be, m, t, list(lv.hours), vs, cache, source=source)
     else:
-        u = _forecast_weather(be, m, t, list(lv.hours), vs, cache)
+        raise BackendUnavailable(f"{m}: backend {be} has no calendar-month / target-window route yet")
     keep = [v for v in vs if v in u]
     if not keep:
         raise BackendUnavailable(f"{m}: none of {vs} available (has {list(u.data_vars)})")
     miss = [v for v in vs if v not in u]
     if miss and variable is not None: warnings.warn(f"{m}: variables {miss} not provided by this model - skipped")
-    u = u[keep]
+    u = u[keep + [f"valid_{v}" for v in keep if f"valid_{v}" in u]]
     if verbose:
-        rng = f"weeks {u.week.values[0]}..{u.week.values[-1]}" if "week" in u.dims else f"leads {int(u.lead[0])}..{int(u.lead[-1])}h ({u.sizes['lead']})"
-        print(f"[weatherpre] {m} init={u.attrs.get('init')} backend={u.attrs.get('backend')} {rng} vars={','.join(keep)}")
+        if "period" in u.dims: rng = f"periods {u.period.values[0]}..{u.period.values[-1]} ({u.sizes['period']}), members {u.sizes.get('member', 1)}"
+        elif "week" in u.dims: rng = f"weeks {u.week.values[0]}..{u.week.values[-1]}"
+        else: rng = f"leads {int(u.lead[0])}..{int(u.lead[-1])}h ({u.sizes['lead']})"
+        print(f"[weatherpre] {m} init={u.attrs.get('init', str(t)[:13])} backend={u.attrs.get('backend')} {rng} vars={','.join(keep)}")
     return u
 
-def _forecast_weather(be, m, t, leads, vs, cache):
+def _forecast_run(m, t, lv, vs, *, source, checkpoint, members, seed, device, model_backend, forcing, forcing_provenance, out_dir,
+                  resume, require_complete):
+    """Model run through a registered adapter (weatherpre.runners), then aggregation to the requested periods."""
+    from . import runners, schema
+    req = runners.RunRequest(m, vs, lv, t, members=members or 1, seed=seed, device=device or "cpu", source=source,
+                             checkpoint=checkpoint, backend=model_backend, forcing=forcing, forcing_provenance=forcing_provenance,
+                             out_dir=Path(out_dir) if out_dir else None, resume=resume)
+    native = runners.get(m)(req)
+    init_time = np.datetime64(native.init_time.values, "s")
+    if lv.scale == C.WEATHER:
+        return native
+    out = schema.aggregate(native, lv.periods(init_time), require_complete=require_complete)
+    out.attrs["product"] = native.attrs.get("product") if native.attrs.get("product") == "scenario" else lv.product
+    out.attrs["init"] = str(init_time)[:13]
+    if lv.notes: out.attrs["lead_notes"] = " | ".join(lv.notes)
+    if out_dir:
+        p = Path(out_dir) / f"{m}_{str(init_time)[:10]}_{lv.product}.nc"
+        out.to_netcdf(p); out.attrs["file"] = str(p)
+    return out
+
+def _forecast_weather(be, m, t, leads, vs, cache, source=None):
     if be == "wb2":
         d, src, _ = _wb2(m, t, leads)
         return to_user(d, t, m, be, src)
@@ -269,10 +325,10 @@ def _forecast_weather(be, m, t, leads, vs, cache):
     if be == "e2s":
         from .adapters import earth2studio_run as E
         cls = m[4:] if m.startswith("e2s:") else C.get(m).e2s
-        u = E.forecast(cls, t, leads, vs, model_name=m); u.attrs["scale"] = "weather"; return u
+        u = E.forecast(cls, t, leads, vs, source=source, model_name=m); u.attrs["scale"] = "weather"; return u
     raise ValueError(f"backend {be!r} cannot serve weather-scale leads")
 
-def _forecast_s2s(be, m, t, lv: L.Leads, vs, cache):
+def _forecast_s2s(be, m, t, lv: L.Leads, vs, cache, source=None):
     from . import s2s
     weeks = list(lv.weeks)
     if be == "wb2-ext": return s2s.ifs_ext(t, weeks, vs)
@@ -283,7 +339,10 @@ def _forecast_s2s(be, m, t, lv: L.Leads, vs, cache):
     elif be == "e2s":
         from .adapters import earth2studio_run as E
         cls = m[4:] if m.startswith("e2s:") else C.get(m).e2s
-        u = E.forecast(cls, t, hours, vs, model_name=m)
+        if cls in E.DAILY_MEAN_MODELS:
+            raise BackendUnavailable(f"{m}: Earth2Studio {cls} returns daily means labelled at the start of each day; the 6-hourly weekly "
+                                     "path would mix the input day into week 1. Use backend='weatherai' (daily-mean aware).")
+        u = E.forecast(cls, t, hours, vs, source=source, model_name=m)
     elif be in ("hf",):
         u = _hf(t, hours[1:])
     else:
@@ -292,4 +351,8 @@ def _forecast_s2s(be, m, t, lv: L.Leads, vs, cache):
 
 def best_models(init="latest", preset="week"):
     t = _init(init)
+    if preset == "s2s":                     # catalog-driven: hosted S2S models that are available for this init
+        from . import availability as A
+        lv = L.parse("6w")
+        return [a.model for a in A.candidates(None, lv, t) if a.ok and C.get(a.model).hosted]
     return (BEST_LATEST if _recent(t) else BEST_HIST)[preset]

@@ -189,6 +189,24 @@ wp.forecast(model, variable, lead, init)
 
 Truth: ERA5 6-hourly (weather, 2018–2021), ERA5 weekly means + 1990–2017 weekly climatology (S2S, to 2023-01), IFS analysis as a proxy for recent weather cycles. Future valid times cannot be scored; for those, `compare` reports the inter-model spread.
 
+## 🌊 AI sub-seasonal, seasonal and ocean models
+
+`weatherpre models` lists every model with its route, product, technical and validated horizon and evidence;
+`weatherpre check MODEL VAR LEAD --init DATE` explains what is missing (weights, inputs, GPU, horizon, ...).
+
+```python
+wp.forecast("fuxi-s2s", "t2m,tp,sst", "6w", init="2022-12-01", members=11, checkpoint="/ckpt/fuxi_s2s")  # official ONNX via WeatherAI
+wp.forecast("orca-dl", "tos", init="2026-12-01", target_start="2027-01-01", target_end="2027-06-30",
+            members=[1, 2, 3], checkpoint="/ckpt/orca_dl")        # calendar months; tos = 5 m proxy, never relabelled sst
+wp.planner.plan(["fuxi-s2s", "orca-dl", "ace2"], "t2m", "6w", "2022-12-01")   # resource-limited plan, no GPU unless allowed
+```
+
+`6m` means six **calendar months**; FuXi-S2S is refused beyond 42 days; ACE2 needs boundary conditions for the whole
+period and a stated provenance; UniCM is blocked (no published weights); members, masks and run manifests are kept.
+Details: [docs/AI_MODELS.md](docs/AI_MODELS.md) · validation: [docs/VALIDATION.md](docs/VALIDATION.md) · report hand-off:
+[docs/SST_S2S_HANDOFF.md](docs/SST_S2S_HANDOFF.md) · GPU boxes: [docs/REMOTE.md](docs/REMOTE.md).
+No AI model has independent hindcast skill evidence yet: they are run and compared, not weighted.
+
 ## ⚠️ Honest limits
 
 * Hosted archives differ: WeatherBench 2 forecasts are 1.5° and mostly 2018–2022; ECMWF Open Data keeps only ~4 days; GEFSv12 starts 2020-09-23 and reaches 35 days (00Z); CFSv2 (member 1) is not bias-corrected, so its S2S anomalies carry model climate drift (e.g. over high terrain).
@@ -198,7 +216,8 @@ Truth: ERA5 6-hourly (weather, 2018–2021), ERA5 weekly means + 1990–2017 wee
 
 ## 🛣️ Roadmap
 
-- [ ] Probabilistic scores (CRPS, spread–skill) for ensembles (GEFS members, AIFS-ENS, GenCast, FCN3)
+- [x] Probabilistic scores (CRPS, spread–skill, reliability) in `weatherpre.metrics` / `weatherpre.hindcast` (wired for index hindcasts)
+- [ ] Independent hindcasts of ORCA-DL and FuXi-S2S on the 2011–2022 test split (needs weights + GPU; baseline numbers in docs/VALIDATION.md)
 - [ ] Bias-corrected S2S anomalies from reforecasts (ECMWF / CFSv2 hindcasts)
 - [ ] Point / city time series (`wp.forecast(..., at=(35.7, 139.7))`) and regional crops
 - [ ] Published GPU runs (Earth2Studio) for a shared leaderboard

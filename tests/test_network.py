@@ -27,3 +27,10 @@ def test_single_lead_and_single_week_are_scored():
     assert list(c.table().columns) == ["+24h"]
     s = wp.compare(["climatology"], "t2m", "w1", init="2020-10-01", verbose=False)
     assert list(s.table().columns) == ["w1"]
+
+def test_oisst_monthly_nino34_real_data(tmp_path):
+    from weatherpre.sources import oisst
+    m = oisst.monthly_mean("2015-11", cache=str(tmp_path), box=(-6, 6, 185, 245))
+    assert m.attrs["days"] == 30 and m.attrs["units"] == "degC"
+    v = oisst.index(m, "nino34")
+    assert 28.5 < v < 30.5, v                                   # strong El Nino: ~29.5 degC in Nov 2015

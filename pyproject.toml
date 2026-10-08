@@ -24,6 +24,11 @@ dependencies = ["numpy", "pandas", "xarray", "zarr", "gcsfs", "netCDF4", "matplo
 [project.optional-dependencies]
 hf = ["gradio_client", "huggingface_hub"]              # Aurora on the HF ZeroGPU Space
 gpu = ["earth2studio>=0.19"]                           # + the per-model extra, e.g. earth2studio[fcn3]
+# WeatherAI model runs, one environment per family (see docs/AI_MODELS.md): torch (ORCA-DL, ACE2, FuXi-S2S native),
+# onnx (FuXi-S2S official ONNX), jax (NeuralGCM official). weatherai itself: pip install -e /path/to/WeatherAI
+ai-torch = ["torch>=2.1", "huggingface_hub"]
+ai-onnx = ["onnx>=1.15", "onnxruntime>=1.17"]
+ai-jax = ["jax", "neuralgcm"]
 dev = ["pytest", "ruff"]
 
 [project.urls]
