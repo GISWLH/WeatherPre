@@ -1,3 +1,7 @@
+<!-- readme-visual-refresh:banner -->
+![WeatherPre — hand-drawn project banner](assets/readme/banner.svg)
+<!-- /readme-visual-refresh:banner -->
+
 <div align="center">
 
 # 🌦️ WeatherPre
@@ -211,3 +215,7 @@ Ideas and new models are welcome: [open an issue](https://github.com/GISWLH/Weat
 Code: Apache-2.0 ([CITATION.cff](CITATION.cff)). Data and weights keep their own terms: ECMWF Open Data CC-BY-4.0 (credit ECMWF), NOAA public domain, ERA5 / WeatherBench 2 per Copernicus and WB2 terms; non-commercial weights are never committed. Please also cite the models and [WeatherBench 2](https://doi.org/10.1029/2023MS004019) you use.
 
 Built on [WeatherBench 2 / WeatherBench-X](https://github.com/google-research/weatherbenchX), [Earth2Studio](https://github.com/NVIDIA/earth2studio), [ecmwf-opendata](https://github.com/ecmwf/ecmwf-opendata), [microsoft-aurora](https://github.com/microsoft/aurora), NOAA Open Data Dissemination and [cartopy-robinson-lat-clip](https://github.com/GISWLH/cartopy-robinson-lat-clip). Related: [GISWLH/WeatherAI](https://github.com/GISWLH/WeatherAI) (model ports).
+
+<!-- readme-visual-refresh:artwork-source -->
+[Editable banner artwork · Excalidraw](assets/readme/banner.excalidraw)
+<!-- /readme-visual-refresh:artwork-source -->
