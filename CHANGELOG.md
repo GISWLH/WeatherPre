@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased (2026-10-18)
+
+* New hosted S2S model **`canglong`** (aliases `cas-canglong`, `canglong-s2s`): weekly means for weeks 1–6 of the latest
+  CAS-Canglong atmospheric run published on [canglong.earth](https://canglong.earth) (z500, t850, t2m, msl, tp at 1°).
+  Latest run only; not drift-corrected (see Honest limits). Offline tests in `tests/test_canglong_offline.py`.
+
 ## 0.3.0 (2026-10-05)
 
 **Two scales, one call.** Leads up to 15 days are *weather* (instantaneous fields at lead hours); beyond 15 days are

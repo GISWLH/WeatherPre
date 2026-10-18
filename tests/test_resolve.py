@@ -8,6 +8,7 @@ W, S = L.parse("7d"), L.parse("6w")
     ("graphcast", "2020-10-03", W, "wb2"), ("ifs", "2020-10-03", W, "wb2"), ("pangu", "2019-06-01T12", W, "wb2"),
     ("gefs", "2020-10-03", W, "gefs"), ("gefs", "2020-10-01", S, "gefs"), ("cfsv2", "2021-01-01", S, "cfs"),
     ("ifs-ext", "2020-10-01", S, "wb2-ext"), ("climatology", "latest", S, "baseline"), ("persistence", "2020-10-01", S, "baseline"),
+    ("canglong", "latest", S, "canglong"),
     ("aifs", "latest", W, "opendata"), ("gfs", "latest", W, "noaa"), ("aigfs", "latest", W, "noaa"),
 ])
 def test_routes(model, init, lv, backend):

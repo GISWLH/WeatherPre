@@ -7,12 +7,12 @@
 # 🌦️ WeatherPre
 
 **One line to forecast. One line to compare.**<br>
-Weather (≤ 15 days) and sub-seasonal-to-seasonal (> 15 days) forecasts from 28 AI and NWP models (+ 2 baselines) (GraphCast, AIFS, Aurora, FourCastNet 3, GEFS, ECMWF extended range, CFSv2 …), scored against ERA5 with WeatherBench-X.
+Weather (≤ 15 days) and sub-seasonal-to-seasonal (> 15 days) forecasts from 29 AI and NWP models (+ 2 baselines) (GraphCast, AIFS, Aurora, FourCastNet 3, GEFS, ECMWF extended range, CFSv2 …), scored against ERA5 with WeatherBench-X.
 
 [![CI](https://github.com/GISWLH/WeatherPre/actions/workflows/ci.yml/badge.svg)](https://github.com/GISWLH/WeatherPre/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
-![Models](https://img.shields.io/badge/models-28%20%2B%202%20baselines-orange)
+![Models](https://img.shields.io/badge/models-29%20%2B%202%20baselines-orange)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/GISWLH/WeatherPre/blob/main/notebooks/colab_earth2studio.ipynb)
 
 [English](README.md) · [中文](README_zh.md) · [Examples](docs/EXAMPLES.md) · [Survey](docs/SURVEY.md) · [GPU routes](docs/GPU.md) · [Contributing](CONTRIBUTING.md)
@@ -59,6 +59,7 @@ ds = wp.forecast("e2s:FCN3", "t2m", "7d", init="2020-10-03")             # any E
 # S2S scale (> 15 days): weekly means, week k = days 7(k-1)..7k after init
 s = wp.forecast("ifs-ext", "t2m", "6w", init="2020-10-01")               # ECMWF extended range, weeks 1-6
 s = wp.forecast("cfsv2", "tp", "week3-4")                                # latest CFSv2, weeks 3-4
+s = wp.forecast("canglong", "t2m", "6w")                                 # latest CAS-Canglong run (canglong.earth), weeks 1-6
 wp.anomaly(s)                                                            # vs ERA5 1990-2017 weekly climatology
 
 # accuracy comparison
@@ -169,6 +170,7 @@ More (next 48 h / week / 15 days with 7 models, the latest live cycle, maps): **
 | [`gefs`](https://registry.opendata.aws/noaa-gefs/) NOAA GEFS ens. mean | NWP | ✅ hosted | gefs | 0.5° | ≤35 d (00Z) | 2020-09-23 → now (NOAA S3, GEFSv12) | public domain |
 | [`ifs-ext`](https://www.ecmwf.int/en/forecasts/documentation-and-support/extended-range) ECMWF extended range (ens. mean) | NWP | ✅ hosted | wb2-ext | 1.5° | 46 d, weekly means | 2016–2022, Mon/Thu inits (WB2) | WB2 terms |
 | [`cfsv2`](https://registry.opendata.aws/noaa-cfs/) NOAA CFSv2 | NWP | ✅ hosted | cfs | 1° | ≤9 months | 2020 → now (NOAA S3), member 1 | public domain |
+| [`canglong`](https://github.com/GISWLH/CAS-Canglong) CAS-Canglong (atmosphere) | AI | ✅ hosted | canglong | 1° | 6 weeks, weekly means | latest live run (canglong.earth) | see canglong.earth |
 | [`climatology`](https://weatherbench2.readthedocs.io) ERA5 climatology | baseline | ✅ hosted | baseline | 1.5° | any | any date (1990–2017 clim.) | Copernicus |
 | [`persistence`](https://weatherbench2.readthedocs.io) ERA5 anomaly persistence | baseline | ✅ hosted | baseline | 1.5° | any | 1959 – 2023-01 (ERA5 in WB2) | Copernicus |
 | [`ucast`](https://arxiv.org/abs/2604.09041) U-CAST | AI | 🟡 GPU | Earth2Studio `UCast` | 1.5° | 12 h steps | any date | see model card |
@@ -183,7 +185,7 @@ More (next 48 h / week / 15 days with 7 models, the latest live cycle, maps): **
 wp.forecast(model, variable, lead, init)
    │  catalog.py: scales, routes, periods, licences          leads.py: "7d" -> weather leads | "6w" -> S2S weeks
    ▼
- resolve()  ── hosted first ──►  WeatherBench 2 (GCS zarr) · ECMWF Open Data · NOAA S3 (GFS, AIGFS, GEFS, CFSv2)
+ resolve()  ── hosted first ──►  WeatherBench 2 (GCS zarr) · ECMWF Open Data · NOAA S3 (GFS, AIGFS, GEFS, CFSv2) · canglong.earth
             ── then GPU ──────►  Earth2Studio (any px model) · HF ZeroGPU Space (Aurora)
    ▼
  one schema: (lead | week, latitude, longitude), z500 / t850 / t2m / msl / tp
@@ -199,6 +201,7 @@ Truth: ERA5 6-hourly (weather, 2018–2021), ERA5 weekly means + 1990–2017 wee
 * Scores of models with other native grids are computed after box-smoothing to the WB2 1.5° grid; this is fair between models but not identical to WB2's conservative regridding.
 * GPU routes are tested end-to-end with Earth2Studio's `Persistence` model on CPU; the large models need a CUDA GPU and their Earth2Studio extra, and several weights are non-commercial.
 * Aurora in 2020 uses ERA5 initial conditions inside its training period (a pipeline check, not out-of-sample skill).
+* `canglong` serves only the latest canglong.earth run (no archive), so it cannot be scored against ERA5 yet. It is not drift-corrected: for the run starting 2026-10-08, the area-mean 2 m temperature poleward of 60°N is +5 K above the ERA5 1990–2017 weekly climatology in week 1 and +14 K in week 6, while 60°S–60°N stays within ±1 K. Treat its high-latitude `wp.anomaly()` as model drift.
 
 ## 🛣️ Roadmap
 

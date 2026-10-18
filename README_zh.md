@@ -3,7 +3,7 @@
 # 🌦️ WeatherPre
 
 **一行预报，一行对比。**<br>
-天气尺度（≤ 15 天）与次季节–季节尺度（S2S，> 15 天）预报：28 个 AI / 数值模式（GraphCast、AIFS、Aurora、FourCastNet 3、GEFS、ECMWF 延伸期、CFSv2 …）+ 2 个基准，统一用 WeatherBench-X 对 ERA5 评分。
+天气尺度（≤ 15 天）与次季节–季节尺度（S2S，> 15 天）预报：29 个 AI / 数值模式（GraphCast、AIFS、Aurora、FourCastNet 3、GEFS、ECMWF 延伸期、CFSv2 …）+ 2 个基准，统一用 WeatherBench-X 对 ERA5 评分。
 
 [English](README.md) · [中文](README_zh.md) · [示例](docs/EXAMPLES.md) · [调研](docs/SURVEY.md) · [GPU 路线](docs/GPU.md) · [贡献指南](CONTRIBUTING.md)
 
@@ -45,6 +45,7 @@ ds = wp.forecast("e2s:FCN3", "t2m", "7d", init="2020-10-03")             # 任�
 # S2S 尺度（> 15 天）：周平均，第 k 周 = 起报后第 7(k-1)..7k 天
 s = wp.forecast("ifs-ext", "t2m", "6w", init="2020-10-01")               # ECMWF 延伸期，第 1–6 周
 s = wp.forecast("cfsv2", "tp", "week3-4")                                # 最新 CFSv2，第 3–4 周
+s = wp.forecast("canglong", "t2m", "6w")                                 # canglong.earth 上最新的 CAS-Canglong，第 1–6 周
 wp.anomaly(s)                                                            # 相对 ERA5 1990–2017 周气候态的距平
 
 # 精度对比（可对多个起报时刻平均）
@@ -126,6 +127,7 @@ cmp = wp.compare(["ifs-ext", "gefs", "cfsv2", "persistence", "climatology"], "t2
 | [`gefs`](https://registry.opendata.aws/noaa-gefs/) NOAA GEFS ens. mean | NWP | ✅ hosted | gefs | 0.5° | ≤35 d (00Z) | 2020-09-23 → now (NOAA S3, GEFSv12) | public domain |
 | [`ifs-ext`](https://www.ecmwf.int/en/forecasts/documentation-and-support/extended-range) ECMWF extended range (ens. mean) | NWP | ✅ hosted | wb2-ext | 1.5° | 46 d, weekly means | 2016–2022, Mon/Thu inits (WB2) | WB2 terms |
 | [`cfsv2`](https://registry.opendata.aws/noaa-cfs/) NOAA CFSv2 | NWP | ✅ hosted | cfs | 1° | ≤9 months | 2020 → now (NOAA S3), member 1 | public domain |
+| [`canglong`](https://github.com/GISWLH/CAS-Canglong) CAS-Canglong (atmosphere) | AI | ✅ hosted | canglong | 1° | 6 weeks, weekly means | latest live run (canglong.earth) | see canglong.earth |
 | [`climatology`](https://weatherbench2.readthedocs.io) ERA5 climatology | baseline | ✅ hosted | baseline | 1.5° | any | any date (1990–2017 clim.) | Copernicus |
 | [`persistence`](https://weatherbench2.readthedocs.io) ERA5 anomaly persistence | baseline | ✅ hosted | baseline | 1.5° | any | 1959 – 2023-01 (ERA5 in WB2) | Copernicus |
 | [`ucast`](https://arxiv.org/abs/2604.09041) U-CAST | AI | 🟡 GPU | Earth2Studio `UCast` | 1.5° | 12 h steps | any date | see model card |
@@ -139,6 +141,7 @@ cmp = wp.compare(["ifs-ext", "gefs", "cfsv2", "persistence", "climatology"], "t2
 * 各存档覆盖不同：WeatherBench 2 预报为 1.5°、多为 2018–2022；ECMWF Open Data 仅保留约 4 天；GEFSv12 自 2020-09-23 起、00Z 可到 35 天；CFSv2（成员 1）未做偏差订正，S2S 距平含模式气候漂移（如高原地区）。
 * 其他原生网格的模型先平滑到 WB2 1.5° 网格再评分，模型间公平，但与 WB2 的守恒插值不完全相同。
 * GPU 路线已用 Earth2Studio 的 `Persistence` 模型在 CPU 上端到端测试；大模型需要 CUDA GPU，部分权重为非商用许可。
+* `canglong` 只提供 canglong.earth 上最新的一次运行（无存档），暂时无法对 ERA5 评分；且未做漂移订正：2026-10-08 起报的一次运行中，60°N 以北面积平均 2 m 气温比 ERA5 1990–2017 周气候态第 1 周高 5 K、第 6 周高 14 K，而 60°S–60°N 保持在 ±1 K 以内。其高纬 `wp.anomaly()` 应视为模式漂移。
 
 ## 📚 引用与许可
 

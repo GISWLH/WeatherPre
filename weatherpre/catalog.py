@@ -15,7 +15,7 @@ class Model:
     label: str
     kind: str                             # "AI" | "NWP" | "baseline"
     scales: tuple[str, ...]               # subset of (WEATHER, S2S)
-    routes: tuple[str, ...]               # wb2 | opendata | noaa | gefs | cfs | wb2-ext | baseline | hf | e2s
+    routes: tuple[str, ...]               # wb2 | opendata | noaa | gefs | cfs | wb2-ext | baseline | canglong | hf | e2s
     grid: str
     lead: str
     period: str                           # where hosted data exists
@@ -69,6 +69,9 @@ MODELS: dict[str, Model] = {m.name: m for m in [
           "Copernicus", "https://weatherbench2.readthedocs.io", aliases=("clim",)),
     Model("persistence", "ERA5 anomaly persistence", "baseline", _S, ("baseline",), "1.5°", "any",
           "1959 – 2023-01 (ERA5 in WB2)", "Copernicus", "https://weatherbench2.readthedocs.io"),
+    Model("canglong", "CAS-Canglong (atmosphere)", "AI", _S, ("canglong",), "1°", "6 weeks, weekly means",
+          "latest live run (canglong.earth)", "see canglong.earth", "https://github.com/GISWLH/CAS-Canglong",
+          aliases=("cas-canglong", "canglong-s2s")),
     # ---------------- GPU: HF ZeroGPU / Earth2Studio ----------------
     Model("aurora", "Aurora", "AI", _W, ("hf", "e2s"), "0.25°", "any (chunked)", "any date (ERA5 / IFS ICs)", "MIT",
           "https://doi.org/10.1038/s41586-025-09005-y", e2s="Aurora"),

@@ -79,7 +79,7 @@ def _gpu_route(m: str, t, scale) -> tuple[str, str, object]:
 
 def resolve(model: str, init, leads=None) -> tuple[str, str, object]:
     """-> (backend, canonical_model, init_datetime|'latest').
-    backend in wb2 | opendata | noaa | gefs | cfs | wb2-ext | baseline | hf | e2s."""
+    backend in wb2 | opendata | noaa | gefs | cfs | wb2-ext | baseline | canglong | hf | e2s."""
     m, t = _canon(model), _init(init)
     lv = leads if isinstance(leads, L.Leads) else L.parse(lead_hours=leads) if leads is not None else L.parse("7d")
     scale = lv.scale
@@ -100,6 +100,7 @@ def resolve(model: str, init, leads=None) -> tuple[str, str, object]:
         if m in ("climatology", "persistence"):
             if t == "latest": t = dt.datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
             return "baseline", m, t
+        if m == "canglong": return "canglong", m, t
     if m == "aurora" and "e2s" in spec.routes and _e2s_local():
         return "e2s", m, t
     if m == "aurora": return "hf", m, t
@@ -277,6 +278,9 @@ def _forecast_s2s(be, m, t, lv: L.Leads, vs, cache):
     weeks = list(lv.weeks)
     if be == "wb2-ext": return s2s.ifs_ext(t, weeks, vs)
     if be == "baseline": return getattr(s2s, m)(t, weeks, vs)
+    if be == "canglong":
+        from .adapters import canglong_earth
+        return canglong_earth.forecast(t, weeks, vs, cache / "canglong")
     hours = s2s.s2s_leads(weeks, 6)
     if be == "gefs": u = _gefs(t, hours, cache, precip="tp" in vs)
     elif be == "cfs": u = _cfs(t, hours[1:], vs, cache)
