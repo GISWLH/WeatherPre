@@ -1,10 +1,10 @@
 <!-- readme-visual-refresh:banner -->
-![WeatherPre — hand-drawn project banner](assets/readme/banner.svg)
+![WeatherPre: 29 AI and NWP models, one call, one xarray.Dataset, scored against ERA5 (hand-drawn header)](assets/readme/header.svg)
 <!-- /readme-visual-refresh:banner -->
 
 <div align="center">
 
-# 🌦️ WeatherPre
+# <img src="assets/logo.svg" width="44" align="absmiddle" alt=""> WeatherPre
 
 **One line to forecast. One line to compare.**<br>
 Weather (≤ 15 days) and sub-seasonal-to-seasonal (> 15 days) forecasts from 29 AI and NWP models (+ 2 baselines) (GraphCast, AIFS, Aurora, FourCastNet 3, GEFS, ECMWF extended range, CFSv2 …), scored against ERA5 with WeatherBench-X.
@@ -233,5 +233,5 @@ Code: Apache-2.0 ([CITATION.cff](CITATION.cff)). Data and weights keep their own
 Built on [WeatherBench 2 / WeatherBench-X](https://github.com/google-research/weatherbenchX), [Earth2Studio](https://github.com/NVIDIA/earth2studio), [ecmwf-opendata](https://github.com/ecmwf/ecmwf-opendata), [microsoft-aurora](https://github.com/microsoft/aurora), NOAA Open Data Dissemination and [cartopy-robinson-lat-clip](https://github.com/GISWLH/cartopy-robinson-lat-clip). Related: [GISWLH/WeatherAI](https://github.com/GISWLH/WeatherAI) (model ports).
 
 <!-- readme-visual-refresh:artwork-source -->
-[Editable banner artwork · Excalidraw](assets/readme/banner.excalidraw)
+Editable artwork (Excalidraw): [header](assets/readme/header.excalidraw) · [logo](assets/logo.excalidraw)
 <!-- /readme-visual-refresh:artwork-source -->
