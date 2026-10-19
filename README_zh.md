@@ -1,6 +1,10 @@
+<!-- readme-visual-refresh:banner -->
+![WeatherPre：29 个 AI / 数值模式，一次调用，统一的 xarray.Dataset，对 ERA5 评分（手绘头图）](assets/readme/header.svg)
+<!-- /readme-visual-refresh:banner -->
+
 <div align="center">
 
-# 🌦️ WeatherPre
+# <img src="assets/logo.svg" width="44" align="absmiddle" alt=""> WeatherPre
 
 **一行预报，一行对比。**<br>
 天气尺度（≤ 15 天）与次季节–季节尺度（S2S，> 15 天）预报：29 个 AI / 数值模式（GraphCast、AIFS、Aurora、FourCastNet 3、GEFS、ECMWF 延伸期、CFSv2 …）+ 2 个基准，统一用 WeatherBench-X 对 ERA5 评分。
@@ -146,3 +150,7 @@ cmp = wp.compare(["ifs-ext", "gefs", "cfsv2", "persistence", "climatology"], "t2
 ## 📚 引用与许可
 
 代码 Apache-2.0（[CITATION.cff](CITATION.cff)）。数据与权重遵循各自条款：ECMWF Open Data CC-BY-4.0、NOAA 公有领域、ERA5 / WeatherBench 2 按 Copernicus 与 WB2 条款。
+
+<!-- readme-visual-refresh:artwork-source -->
+可编辑的 Excalidraw 原图：[头图](assets/readme/header.excalidraw) · [Logo](assets/logo.excalidraw)
+<!-- /readme-visual-refresh:artwork-source -->
