@@ -31,6 +31,11 @@ cmp.ranking()                                                               # wh
 
 ## ✨ Why WeatherPre
 
+**Research universe update (19 Oct 2026):** [PBC calibration, GenFocal downscaling
+and gray-swan ERF diagnostics](docs/RESEARCH.md) are available through
+`wp.load_research(...)` with optional `weatherpre[research]`. Their catalog
+status is `research`; untrained lite outputs do not enter forecast rankings.
+
 * **Model × variable × horizon → result.** No GRIB plumbing, no regridding, no per-model APIs: one `xarray.Dataset` with the same names and units for every model.
 * **Two forecast scales, one interface.** `"48h"`, `"7d"`, `"15d"` → *weather* (fields at lead hours); `"6w"`, `"45d"`, `"week3-4"` → *S2S* (weekly means and anomalies).
 * **Accuracy built in.** `wp.compare(...)` scores every model on the same grid with [WeatherBench-X](https://github.com/google-research/weatherbenchX) (area-weighted RMSE and ACC; ERA5 for the past, IFS analysis for recent cycles), averages over many inits, ranks the models and draws the figures.
@@ -177,6 +182,14 @@ More (next 48 h / week / 15 days with 7 models, the latest live cycle, maps): **
 | [`fuxi-s2s`](https://doi.org/10.1038/s41467-024-50714-1) FuXi-S2S | AI | 🟡 GPU | Earth2Studio `FuXiS2S` | 1.5° | 42 d, daily | any date | CC-BY-NC-ND |
 | [`dlesym`](https://arxiv.org/abs/2409.16247) DLESyM (atmos.+ocean) | AI | 🟡 GPU | Earth2Studio `DLESyMLatLon` | ~1° HEALPix | 6 h → seasonal | any date | see model card |
 | [`ace2`](https://arxiv.org/abs/2411.11268) ACE2-ERA5 | AI | 🟡 GPU | Earth2Studio `ACE2ERA5` | 1° | 6 h → climate | any date (forcings) | Apache-2.0 |
+
+**Research methods in the forecast universe** ([usage](docs/RESEARCH.md))
+
+| Method | Role | Availability |
+|---|---|---|
+| [`pbc`](https://doi.org/10.1038/s41586-026-11126-x) | calibration | fit historical CDFs, climatology and observable lags first |
+| [`genfocal`](https://doi.org/10.1038/s42256-026-01308-7) | downscaling | two-stage lite; official JAX weights require upstream runtime |
+| [`translocation`](https://doi.org/10.1126/sciadv.ady9406) | diagnostic | supply a differentiable pretrained backbone for scientific use |
 <!-- MODELS:END -->
 
 ## 🧭 How it works

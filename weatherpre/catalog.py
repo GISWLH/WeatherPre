@@ -23,18 +23,29 @@ class Model:
     ref: str = ""                         # paper / model card
     e2s: str = ""                         # earth2studio.models.px class name (GPU route)
     aliases: tuple[str, ...] = field(default_factory=tuple)
+    role: str = "forecast"                 # forecast | calibration | downscaling | diagnostic
 
     @property
     def hosted(self) -> bool:             # runs on any laptop (no GPU)
-        return any(r not in ("hf", "e2s") for r in self.routes)
+        return self.role == "forecast" and any(r not in ("hf", "e2s") for r in self.routes)
 
     @property
     def status(self) -> str:
+        if self.role != "forecast": return "research"
         if self.hosted: return "hosted"
         return "gpu" if self.routes else "blocked"
 
 _W, _S, _WS = (WEATHER,), (S2S,), (WEATHER, S2S)
 MODELS: dict[str, Model] = {m.name: m for m in [
+    Model("pbc", "Probabilistic Bias Correction", "AI", _S, ("weatherai",), "user supplied",
+          "days 19-25 / 26-32 in paper", "fit historical CDFs, climatology and observable lags first",
+          "MIT", "https://doi.org/10.1038/s41586-026-11126-x", role="calibration"),
+    Model("genfocal", "GenFocal", "AI", (), ("weatherai",), "1.5° to regional 0.25° in paper",
+          "climate trajectories", "two-stage lite; official JAX weights require upstream runtime",
+          "upstream Apache-2.0; weights CC-BY-4.0", "https://doi.org/10.1038/s42256-026-01308-7", role="downscaling"),
+    Model("translocation", "Gray-swan translocation / ERF", "AI", _W, ("weatherai",), "backbone grid",
+          "one-step sensitivity", "supply a differentiable pretrained backbone for scientific use",
+          "backbone-specific", "https://doi.org/10.1126/sciadv.ady9406", aliases=("gray-swan",), role="diagnostic"),
     # ---------------- weather scale, hosted (no GPU) ----------------
     Model("ifs-hres", "ECMWF IFS HRES", "NWP", _W, ("opendata", "wb2"), "0.25° / 1.5°", "≤15 d",
           "latest ~4 d (Open Data) · 2016–2022 (WB2)", "CC-BY-4.0", "https://www.ecmwf.int/en/forecasts",
@@ -124,7 +135,7 @@ def for_scale(scale: str, hosted_only=False) -> list[Model]:
 def table(scale: str | None = None):
     """pandas DataFrame of the catalog (optionally one scale)."""
     import pandas as pd
-    rows = [dict(model=m.name, label=m.label, kind=m.kind, scales="+".join(m.scales), status=m.status,
+    rows = [dict(model=m.name, label=m.label, kind=m.kind, role=m.role, scales="+".join(m.scales), status=m.status,
                  route=",".join(m.routes) or "-", grid=m.grid, lead=m.lead, period=m.period, licence=m.licence)
             for m in MODELS.values() if scale is None or scale in m.scales]
     return pd.DataFrame(rows)

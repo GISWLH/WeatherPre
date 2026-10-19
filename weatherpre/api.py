@@ -86,6 +86,9 @@ def resolve(model: str, init, leads=None) -> tuple[str, str, object]:
     if m.startswith("e2s:"): return _gpu_route(m, t, scale)
     if m not in C.MODELS: raise BackendUnavailable(f"unknown model {model!r}; see weatherpre.models()")
     spec = C.MODELS[m]
+    if spec.role != "forecast":
+        raise BackendUnavailable(f"{m} is a {spec.role} research method, not a standalone deterministic forecast. "
+                                 f"Use weatherpre.load_research('{m}') and weatherpre.research; see docs/RESEARCH.md.")
     if scale not in spec.scales:
         alt = ", ".join(x.name for x in C.for_scale(scale, hosted_only=True))
         what = "weather (<= 15 days)" if scale == C.S2S else "S2S (> 15 days)"

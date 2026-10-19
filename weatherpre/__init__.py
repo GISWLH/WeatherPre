@@ -10,6 +10,8 @@ __version__ = "0.3.0"
 _API = ("forecast", "models", "best_models", "BackendUnavailable", "PRESETS", "variables", "resolve")
 
 def __getattr__(name):            # lazy: keep `import weatherpre` light
+    if name in ("load_research", "calibrate", "downscale", "diagnose"):
+        from . import research; return getattr(research, name)
     if name in _API:
         from . import api; return getattr(api, name)
     if name in ("compare", "Comparison"):
@@ -23,3 +25,4 @@ def __getattr__(name):            # lazy: keep `import weatherpre` light
     raise AttributeError(name)
 
 __all__ = list(_API) + ["compare", "Comparison", "plot_maps", "plot_skill", "plot_s2s", "plot_models", "anomaly"]
+__all__ += ["load_research", "calibrate", "downscale", "diagnose"]

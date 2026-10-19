@@ -22,6 +22,7 @@ dependencies = ["numpy", "pandas", "xarray", "zarr", "gcsfs", "netCDF4", "matplo
                 "ecmwf-opendata", "weatherbenchX @ git+https://github.com/google-research/weatherbenchX.git"]
 
 [project.optional-dependencies]
+research = ["weatherai @ git+https://github.com/GISWLH/WeatherAI"]
 hf = ["gradio_client", "huggingface_hub"]              # Aurora on the HF ZeroGPU Space
 gpu = ["earth2studio>=0.19"]                           # + the per-model extra, e.g. earth2studio[fcn3]
 dev = ["pytest", "ruff"]

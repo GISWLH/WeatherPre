@@ -6,7 +6,7 @@ def test_every_model_is_consistent():
         assert set(m.scales) <= {C.WEATHER, C.S2S}, m.name
         assert m.kind in ("AI", "NWP", "baseline"), m.name
         if "e2s" in m.routes: assert m.e2s, m.name
-        assert m.status in ("hosted", "gpu", "blocked")
+        assert m.status in ("hosted", "gpu", "blocked", "research")
 
 def test_both_scales_have_hosted_models():
     assert len(C.for_scale(C.WEATHER, hosted_only=True)) >= 8
