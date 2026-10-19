@@ -38,13 +38,13 @@ class Model:
 _W, _S, _WS = (WEATHER,), (S2S,), (WEATHER, S2S)
 MODELS: dict[str, Model] = {m.name: m for m in [
     Model("pbc", "Probabilistic Bias Correction", "AI", _S, ("weatherai",), "user supplied",
-          "days 19-25 / 26-32 in paper", "fit historical CDFs, climatology and observable lags first",
+          "days 19-25 / 26-32 in paper", "official author scripts; fit historical data (no universal weights)",
           "MIT", "https://doi.org/10.1038/s41586-026-11126-x", role="calibration"),
     Model("genfocal", "GenFocal", "AI", (), ("weatherai",), "1.5° to regional 0.25° in paper",
-          "climate trajectories", "two-stage lite; official JAX weights require upstream runtime",
+          "climate trajectories", "official pinned JAX/Flax and published ReFlow + EMA checkpoints",
           "upstream Apache-2.0; weights CC-BY-4.0", "https://doi.org/10.1038/s42256-026-01308-7", role="downscaling"),
     Model("translocation", "Gray-swan translocation / ERF", "AI", _W, ("weatherai",), "backbone grid",
-          "one-step sensitivity", "supply a differentiable pretrained backbone for scientific use",
+          "6h autoregressive sensitivity", "official pretrained GraphCast + author-referenced ERF diagnostics",
           "backbone-specific", "https://doi.org/10.1126/sciadv.ady9406", aliases=("gray-swan",), role="diagnostic"),
     # ---------------- weather scale, hosted (no GPU) ----------------
     Model("ifs-hres", "ECMWF IFS HRES", "NWP", _W, ("opendata", "wb2"), "0.25° / 1.5°", "≤15 d",

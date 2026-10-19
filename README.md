@@ -32,8 +32,8 @@ cmp.ranking()                                                               # wh
 ## ✨ Why WeatherPre
 
 **Research universe update (19 Oct 2026):** [PBC calibration, GenFocal downscaling
-and gray-swan ERF diagnostics](docs/RESEARCH.md) are available through
-`wp.load_research(...)` with optional `weatherpre[research]`. Their catalog
+and gray-swan ERF diagnostics](docs/RESEARCH.md) are available.
+`wp.load_research(...)` defaults to official author code/weights (`lite=True` is explicit), with optional `weatherpre[research]`. Their catalog
 status is `research`; untrained lite outputs do not enter forecast rankings.
 
 * **Model × variable × horizon → result.** No GRIB plumbing, no regridding, no per-model APIs: one `xarray.Dataset` with the same names and units for every model.
@@ -188,8 +188,8 @@ More (next 48 h / week / 15 days with 7 models, the latest live cycle, maps): **
 | Method | Role | Availability |
 |---|---|---|
 | [`pbc`](https://doi.org/10.1038/s41586-026-11126-x) | calibration | fit historical CDFs, climatology and observable lags first |
-| [`genfocal`](https://doi.org/10.1038/s42256-026-01308-7) | downscaling | two-stage lite; official JAX weights require upstream runtime |
-| [`translocation`](https://doi.org/10.1126/sciadv.ady9406) | diagnostic | supply a differentiable pretrained backbone for scientific use |
+| [`genfocal`](https://doi.org/10.1038/s42256-026-01308-7) | downscaling | official JAX/Flax, published ReFlow and SR/EMA weights |
+| [`translocation`](https://doi.org/10.1126/sciadv.ady9406) | diagnostic | official pretrained GraphCast + signed ERF |
 <!-- MODELS:END -->
 
 ## 🧭 How it works

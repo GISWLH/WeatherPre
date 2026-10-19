@@ -2,7 +2,13 @@
 from . import catalog
 
 
-def load_research(name, *, lite=True, **kwargs):
+def load_research(name, *, lite=False, **kwargs):
+    """Load pinned author implementations by default; lite requires opt-in.
+
+    PBC requires work_dir (official historical-data fitting pipeline).
+    GenFocal/Translocation download official pretrained parameters; install
+    WeatherAI's documented Linux JAX runtime. Errors never trigger lite fallback.
+    """
     name = catalog.canonical(name)
     if name not in ("pbc", "genfocal", "translocation"):
         raise ValueError("research methods: pbc, genfocal, translocation")
@@ -13,7 +19,11 @@ def load_research(name, *, lite=True, **kwargs):
     classes = {"pbc": (weatherai.PBC, weatherai.PBC_lite),
                "genfocal": (weatherai.GenFocal, weatherai.GenFocal_lite),
                "translocation": (weatherai.Translocation, weatherai.Translocation_lite)}
-    return classes[name][int(lite)](**kwargs)
+    if lite:
+        return classes[name][1](**kwargs)
+    if name == "pbc":
+        return classes[name][0](**kwargs)
+    return classes[name][0].from_pretrained(**kwargs)
 
 
 def calibrate(model, raw, climatology, lag1, lag2, *, probabilities=True):
@@ -25,6 +35,8 @@ def calibrate(model, raw, climatology, lag1, lag2, *, probabilities=True):
     import numpy as np
     import torch
     import xarray as xr
+    if getattr(model, "implementation", None) == "official":
+        raise TypeError("Official PBC uses model.run(...) with author-format histories/NetCDF. This tensor helper requires explicit lite=True.")
     arrays = (raw, climatology, lag1, lag2)
     if any(not isinstance(a, xr.DataArray) or "threshold" not in a.dims for a in arrays):
         raise ValueError("pass four xarray.DataArrays with a 'threshold' dimension")
@@ -41,12 +53,14 @@ def calibrate(model, raw, climatology, lag1, lag2, *, probabilities=True):
     coords[last] = np.arange(1, result.shape[-1] + 1) if probabilities else raw.threshold.values
     return xr.DataArray(result.cpu().numpy(), dims=dims[:-1] + (last,), coords=coords,
                         name="probability" if probabilities else "cdf",
-                        attrs={"method": "PBC", "units": "1", "source": "user-fitted WeatherAI PBC",
+                        attrs={"method": "PBC_lite", "units": "1", "source": "user-fitted WeatherAI lite approximation",
                                "paper": catalog.get("pbc").ref})
 
 
 def downscale(model, x, cond, **kwargs):
     """Two-stage GenFocal normalized tensor route; see model.downscale docs."""
+    if getattr(model, "implementation", None) == "official":
+        raise TypeError("Official GenFocal uses model.sample_debiasing(...) or model.trajectory_sampler(...); downscale is the explicit lite tensor helper")
     return model.downscale(x, cond, **kwargs)
 
 

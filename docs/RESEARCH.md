@@ -1,79 +1,61 @@
-# Research methods in the forecast universe
+# Official research methods in the forecast universe
 
-The catalog includes three papers with explicit roles and `research` status:
+`load_research` now defaults to **official author implementations**. Lite
+experiments require `lite=True`; errors never trigger a lite fallback.
 
-| Name | Role | Paper | Available path |
-|---|---|---|---|
-| `pbc` | Probabilistic S2S calibration | [Nature 2026](https://doi.org/10.1038/s41586-026-11126-x) | Historical fit, CDF projection and five-category probabilities |
-| `genfocal` | Climate regional downscaling | [Nature Machine Intelligence 2026](https://doi.org/10.1038/s42256-026-01308-7) | Two-stage ReFlow + EDM native lite; explicit normalized tensor inputs |
-| `translocation` (`gray-swan`) | Extreme-event diagnostics | [Science Advances 2026](https://doi.org/10.1126/sciadv.ady9406) | GraphCast lite / supplied differentiable backbone and signed ERF |
-
-These are not interchangeable deterministic weather models. `forecast(...)`
-rejects these names with a pointer to the research API. They appear in
-`wp.models()` / `weatherpre models --all` but are excluded from auto comparison
-and hosted-model counts. GenFocal is a climate trajectory method with no
-weather/S2S forecast scale. The gray-swan paper introduces a mechanism study,
-not an independent forecast architecture.
-
-```bash
-pip install "weatherpre[research] @ git+https://github.com/GISWLH/WeatherPre"
-```
+| Name | Role | Default source and weights |
+|---|---|---|
+| `pbc` | Probabilistic S2S calibration | [Author PBC scripts](https://github.com/mouatadid/pbc); historical fitting, no universal checkpoint |
+| `genfocal` | Climate debiasing / downscaling | [Author GenFocal JAX/Flax](https://github.com/google-research/swirl-dynamics/tree/main/swirl_dynamics/projects/genfocal); published ReFlow/raw and SR/EMA parameters |
+| `translocation` / `gray-swan` | Extreme-event diagnostics | [Official GraphCast](https://github.com/google-deepmind/graphcast) pretrained 0.25°/13-level model and author-referenced ERF |
 
 ```python
 import weatherpre as wp
-print(wp.models()[['model', 'role', 'status']])
-pbc = wp.load_research('pbc')
-genfocal = wp.load_research('genfocal', channels=4)
+pbc = wp.load_research('pbc', work_dir='pbc-work')
+pbc.run('climatology', 'era5-f1_mslp', 19, target_dates='20200106')
+
+# Linux/Python 3.12 plus WeatherAI/hf_official/requirements.txt:
+genfocal = wp.load_research('genfocal', stage='super_resolution')
+# Evaluate the official EMA network with author-normalized arrays:
+# residual = genfocal(x, sigma, cond)
+# genfocal.trajectory_sampler(...) invokes the original full trajectory sampler.
+
 diagnostic = wp.load_research('translocation')
+# inputs, targets, forcings = diagnostic.prepare(era5_dataset)
+# forecast = diagnostic(inputs, targets * float('nan'), forcings)
+# erf = wp.diagnose(diagnostic, inputs, targets_template=targets * float('nan'),
+#                  forcings=forcings, location={'batch':0,'time':-1,'lat':260,'lon':220})
 ```
 
-## PBC: fit, then calibrate
+PBC executes the author's unchanged scripts and original data layout. Prepare
+its forecast/reforecast/observation histories before correction or fitting.
+The paper's windows are days 19–25 and 26–32, distinct from generic weekly
+aggregations. Its published archive contains code, not universal fitted weights.
 
-Prepared PyTorch training tensors are `(sample, *grid, threshold)`; four CDF
-thresholds yield five category probabilities. Supply historical raw CDFs,
-observed indicators, climatology and two lagged observations. Every observation
-must have been available at forecast issuance. Seasonal windows, 20-year
-climatologies and the paper's rolling hyperparameter selection remain the
-data provider's responsibility. The Nature lead windows are days 19-25 and
-26-32, which differ from WeatherPre's standard week3/week4 aggregates.
+GenFocal requires stage-specific input conditioning, statistics and sampling.
+The default checkpoint is CONUS super-resolution; use `stage='debiasing'` for
+the released ReFlow network. Full physical downscaling requires the original
+trajectory pipeline; a denoiser call is not a climate forecast. `wp.downscale`
+is currently the explicit lite tensor helper, so call official sampler methods
+on the official model. `wp.calibrate` likewise remains a lite tensor helper;
+official PBC is run with `pbc.run` and produces author-format NetCDF files.
+
+All three remain in `wp.models()` / `weatherpre models --all` with distinct
+roles and `research` status. They are excluded from automatic deterministic
+forecast rankings. The gray-swan study is not a new forecasting architecture.
+
+For untrained experimental models only:
 
 ```python
-pbc.fit(raw_train, observed_train, climatology_train, lag1_train, lag2_train)
-# xarray inputs have matching dates/grid and a 'threshold' dimension.
-probability = wp.calibrate(pbc, raw_cdf, climatology_cdf, lag1_cdf, lag2_cdf)
-# -> DataArray(time, latitude, longitude, category), units=1
+pbc_lite = wp.load_research('pbc', lite=True)
+genfocal_lite = wp.load_research('genfocal', lite=True, channels=4)
+diagnostic_lite = wp.load_research('translocation', lite=True)
 ```
 
-For separate Debias++ and Persistence++ thresholds, use the WeatherAI tensor
-API's `debias_raw`, `debias_observed` and `debias_target` arguments. Use
-`pbc.state_dict()` to save fitted parameters. There is no universal pretrained
-PBC checkpoint and ensemble means alone are insufficient input.
-
-## GenFocal and gray-swan diagnostics
-
-```python
-genfocal.eval()
-result = wp.downscale(genfocal, normalized_climate, condition,
-                      output_size=(8, 32, 16), flow_steps=8, diffusion_steps=16)
-# condition keys: 'channel:mean', 'channel:std'; tensors B,T,lon,lat,C.
-# Supply baseline, residual_mean and residual_std together for physical units.
-
-diagnostic.eval()
-erf = wp.diagnose(diagnostic, x, channel=0, location=(3, 4))
-# Lite x: B,4,8,16. 'gradient' retains the sign; channel 0 is synthetic.
-# For a real model: wp.load_research('translocation', lite=False, backbone=trained_model)
-```
-
-Lite networks have random weights and do not produce scientifically validated
-forecasts. GenFocal's exact JAX architecture/checkpoint factory is available
-separately as `weatherai.models.genfocal.GenFocalOfficial`; it needs the official
-Linux/JAX runtime. The native lite U-ViT is not checkpoint compatible.
-See [WeatherAI model details and evidence](https://github.com/GISWLH/WeatherAI/blob/main/docs/research_20261019.md).
-
-## HF ZeroGPU
-
-The existing [shared Space](https://huggingface.co/spaces/LonghaoWang/weatherai-graphcast-smoke)
-adds `/research_gpu`: PBC CPU/CUDA agreement and valid probabilities, GenFocal
-two-stage backward/sampling, GraphCast ERF. These are synthetic smoke checks,
-not trained-model forecast-skill tests. Existing `/weatherpre_aurora` remains.
-Run WeatherAI's `scripts/run_research_hf.py` to save timestamped GPU evidence.
+`examples/research_methods.py` is explicitly synthetic/lite. Source revisions,
+checkpoint URLs, licenses and actual test scope are recorded in
+[WeatherAI's integration report](https://github.com/GISWLH/WeatherAI/blob/main/docs/research_20261019.md).
+The [official ZeroGPU Space](https://huggingface.co/spaces/LonghaoWang/weatherai-official)
+uses a dedicated Linux/Python 3.12 runtime. Existing Aurora endpoints and old
+lite smoke tests remain separate. Use WeatherAI's `scripts/run_official_hf.py`
+to prepare author assets and record an actual pretrained GPU result.

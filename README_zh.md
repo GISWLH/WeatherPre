@@ -2,9 +2,7 @@
 ![WeatherPre：29 个 AI / 数值模式，一次调用，统一的 xarray.Dataset，对 ERA5 评分（手绘头图）](assets/readme/header.svg)
 <!-- /readme-visual-refresh:banner -->
 
-**2026-10-19 预报宇宙更新：** [PBC 概率订正、GenFocal 降尺度、灰天鹅迁移机制诊断](docs/RESEARCH.md)
-已接入 `wp.load_research(...)`，安装可选依赖 `weatherpre[research]` 即可调用。
-目录明确标为 `research`，不会把未训练的 lite 输出混入实际预报排名。
+**2026-10-19 预报宇宙更新：** [PBC、GenFocal、灰天鹅 ERF](docs/RESEARCH.md) 已纳入研究目录。`wp.load_research(...)` 默认使用作者官方代码与公开权重，`lite=True` 才加载独立实验实现；PBC 无通用预训练权重，使用官方历史数据拟合流程。
 
 <div align="center">
 
